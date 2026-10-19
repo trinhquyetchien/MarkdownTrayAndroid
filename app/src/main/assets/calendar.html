@@ -43,95 +43,149 @@
         -webkit-font-smoothing: antialiased;
       }
 
-      /* Header */
-      .header {
+      /* Mobile-optimized Header */
+      .mobile-calendar-header {
         display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 16px 24px;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px 14px;
         background: var(--bg-header);
         border-bottom: 1px solid var(--border-color);
-        box-shadow: 0 1px 10px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         z-index: 20;
       }
 
-      .header button {
-        padding: 8px 16px;
-        border: 1px solid var(--border-color);
+      .header-nav-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .nav-btn {
+        width: 42px;
+        height: 42px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
         background: var(--btn-bg);
         color: var(--text-main);
-        border-radius: var(--radius);
+        border: 1px solid var(--border-color);
         cursor: pointer;
-        font-size: 14px;
-        font-weight: 500;
-        font-family: inherit;
-        transition: all 0.2s ease;
+        transition: all 0.2s;
+        padding: 0;
+        flex-shrink: 0;
       }
 
-      .header button:hover {
+      .nav-btn:active {
         background: var(--btn-hover);
-        transform: translateY(-1px);
+        transform: scale(0.94);
       }
 
-      .header h2 {
+      .header-center {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        cursor: pointer;
+        padding: 6px 14px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--border-color);
+        transition: border 0.2s;
+        flex: 1;
+        text-align: center;
+      }
+
+      .header-center:active {
+        border-color: var(--btn-primary);
+      }
+
+      #week-label {
         margin: 0;
-        font-size: 18px;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: -0.2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .date-picker-icon {
+        font-size: 14px;
+      }
+
+      .header-quick-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+      }
+
+      .quick-pill-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 16px;
+        border-radius: 16px;
+        font-size: 13px;
         font-weight: 600;
+        background: var(--btn-bg);
+        color: var(--text-main);
+        border: 1px solid var(--border-color);
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .quick-pill-btn:active {
+        background: var(--btn-hover);
+        transform: scale(0.96);
+      }
+
+      .today-btn {
+        background: rgba(10, 132, 255, 0.15);
+        color: var(--btn-primary);
+        border-color: rgba(10, 132, 255, 0.4);
+      }
+
+      .today-btn .dot {
+        font-size: 9px;
+        color: var(--btn-primary);
       }
 
       .calendar-container {
         flex: 1;
         overflow-y: auto;
+        overflow-x: auto;
         position: relative;
         user-select: none;
         -webkit-user-select: none;
         background: var(--bg-main);
+        -webkit-overflow-scrolling: touch;
       }
 
       .scroll-inner {
         display: flex;
         min-height: 100%;
         height: max-content;
+        width: max-content;
       }
 
       .time-col {
-        width: 65px;
+        width: 55px;
         flex-shrink: 0;
         border-right: 1px solid var(--border-color);
         position: relative;
         background: var(--bg-main);
-      }
-
-      .time-slot {
-        height: 60px;
-        border-bottom: 1px solid transparent;
-        text-align: right;
-        padding-right: 12px;
-        font-size: 12px;
-        color: var(--text-muted);
-        position: relative;
-        font-weight: 500;
-      }
-
-      .time-slot::after {
-        content: "";
-        position: absolute;
-        right: 0;
-        top: 0;
-        border-bottom: 1px solid var(--border-color);
-        width: 8px;
-      }
-
-      .days-container {
-        display: flex;
-        flex: 1;
-        position: relative;
+        z-index: 5;
       }
 
       .day-col {
         flex: 1;
         position: relative;
-        min-width: 100px;
+        min-width: 90px;
+        width: 90px;
       }
 
       .day-header {
@@ -351,9 +405,12 @@
 
       .modal-content {
         background: var(--bg-modal);
-        padding: 28px;
-        border-radius: 12px;
-        width: 380px;
+        padding: 20px;
+        border-radius: 16px;
+        width: 90vw;
+        max-width: 400px;
+        max-height: 90vh;
+        overflow-y: auto;
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
         border: 1px solid var(--border-color);
         color: var(--text-main);
@@ -575,26 +632,46 @@
   </head>
 
   <body>
-    <div class="header">
-      <button onclick="changeWeek(-1)">&#8592; Previous</button>
-      <div style="display: flex; align-items: center; gap: 16px">
-        <h2 id="week-label">Week</h2>
-        <input type="date" id="date-picker" onchange="jumpToDate(this.value)" />
+    <div class="mobile-calendar-header">
+      <div class="header-nav-row">
+        <button class="nav-btn" onclick="changeWeek(-1)" aria-label="Tuần trước">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+
+        <div class="header-center" onclick="openDatePicker()">
+          <h2 id="week-label">Week</h2>
+          <span class="date-picker-icon">📅</span>
+          <input type="date" id="date-picker" onchange="jumpToDate(this.value)" style="opacity: 0; position: absolute; pointer-events: none; width: 0; height: 0;" />
+        </div>
+
+        <button class="nav-btn" onclick="changeWeek(1)" aria-label="Tuần sau">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </button>
       </div>
-      <button onclick="changeWeek(1)">Next &#8594;</button>
+
+      <div class="header-quick-row">
+        <button class="quick-pill-btn today-btn" onclick="goToToday()">
+          <span class="dot">●</span> Hôm nay
+        </button>
+        <button class="quick-pill-btn" onclick="openNewEventModal()">
+          + Thêm lịch
+        </button>
+      </div>
     </div>
 
     <div
+      id="day-headers-wrapper"
       style="
         display: flex;
         border-bottom: 1px solid var(--border-color);
         background: var(--bg-header);
+        overflow-x: hidden;
       "
     >
       <div
-        style="width: 65px; flex-shrink: 0; background: var(--bg-header)"
+        style="width: 55px; flex-shrink: 0; background: var(--bg-header)"
       ></div>
-      <div class="days-container" id="day-headers"></div>
+      <div class="days-container" id="day-headers" style="width: max-content"></div>
     </div>
 
     <div class="calendar-container" id="scroll-area">
@@ -853,6 +930,33 @@
         if (!dateStr) return;
         currentDate = new Date(dateStr);
         renderCalendar();
+      }
+
+      function goToToday() {
+        currentDate = new Date();
+        renderCalendar();
+        setTimeout(() => {
+          const scrollArea = document.getElementById("scroll-area");
+          if (scrollArea) {
+            scrollArea.scrollTop = 8 * PIXELS_PER_HOUR - 60;
+          }
+        }, 50);
+      }
+
+      function openDatePicker() {
+        const dp = document.getElementById("date-picker");
+        if (dp) {
+          if (dp.showPicker) {
+            try { dp.showPicker(); } catch (e) { dp.focus(); }
+          } else {
+            dp.focus();
+          }
+        }
+      }
+
+      function openNewEventModal() {
+        const todayStr = formatDateYMD(new Date());
+        openModalForNewWithDates(todayStr, todayStr);
       }
 
       function updateCurrentTimeLine() {
@@ -2330,6 +2434,17 @@
       }
 
       setInterval(updateCurrentTimeLine, 60000);
+
+      // Synchronize horizontal scrolling between calendar and day headers on mobile
+      window.addEventListener("DOMContentLoaded", () => {
+        const scrollArea = document.getElementById("scroll-area");
+        const headersWrapper = document.getElementById("day-headers-wrapper");
+        if (scrollArea && headersWrapper) {
+          scrollArea.addEventListener("scroll", () => {
+            headersWrapper.scrollLeft = scrollArea.scrollLeft;
+          }, { passive: true });
+        }
+      });
 
       // Auto load for Android WebView
       if (window.AndroidBridge && window.AndroidBridge.getEventsJson) {

@@ -6,11 +6,67 @@ import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.os.FileObserver
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+data class SyncStatusInfo(
+    val exists: Boolean,
+    val lastModified: Long,
+    val sizeBytes: Long,
+    val statusText: String,
+    val isSynced: Boolean,
+    val relativeTime: String
+)
+
+class DirectoryObserver(
+    private val directory: File,
+    private val onFileChanged: (path: String?) -> Unit
+) {
+    private var observer: FileObserver? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    fun start() {
+        if (!directory.exists()) {
+            directory.mkdirs()
+        }
+        stop()
+        val mask = FileObserver.CLOSE_WRITE or FileObserver.CREATE or FileObserver.DELETE or FileObserver.MOVED_TO
+        observer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            object : FileObserver(directory, mask) {
+                override fun onEvent(event: Int, path: String?) {
+                    mainHandler.post { onFileChanged(path) }
+                }
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            object : FileObserver(directory.absolutePath, mask) {
+                override fun onEvent(event: Int, path: String?) {
+                    mainHandler.post { onFileChanged(path) }
+                }
+            }
+        }
+        try {
+            observer?.startWatching()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun stop() {
+        try {
+            observer?.stopWatching()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        observer = null
+    }
+}
 
 class StorageManager(private val context: Context) {
     private val prefs: SharedPreferences =
@@ -22,9 +78,11 @@ class StorageManager(private val context: Context) {
         private const val KEY_DEADLINE_FILE = "key_deadline_file"
         private const val KEY_DEADLINE_ALIAS = "key_deadline_alias"
         private const val KEY_CALENDAR_FILE = "key_calendar_file"
+        private const val KEY_NOTES_ROOT_DIR = "key_notes_root_dir"
 
         val DEFAULT_STORAGE_ROOT: String = Environment.getExternalStorageDirectory().absolutePath
         val DEFAULT_DAILY_DIR: String = "$DEFAULT_STORAGE_ROOT/Note/Daily"
+        val DEFAULT_NOTES_ROOT_DIR: String = "$DEFAULT_STORAGE_ROOT/Note"
         val DEFAULT_DEADLINE_FILE: String = "$DEFAULT_STORAGE_ROOT/Note/Daily/Deadline.md"
         val DEFAULT_CALENDAR_FILE: String = "$DEFAULT_STORAGE_ROOT/Note/calendar.json"
     }
@@ -32,6 +90,15 @@ class StorageManager(private val context: Context) {
     var dailyNotesDir: String
         get() = prefs.getString(KEY_DAILY_DIR, DEFAULT_DAILY_DIR) ?: DEFAULT_DAILY_DIR
         set(value) = prefs.edit().putString(KEY_DAILY_DIR, value).apply()
+
+    var notesRootDir: String
+        get() {
+            val saved = prefs.getString(KEY_NOTES_ROOT_DIR, null)
+            if (!saved.isNullOrEmpty()) return saved
+            val dailyParent = File(dailyNotesDir).parentFile?.absolutePath
+            return dailyParent ?: DEFAULT_NOTES_ROOT_DIR
+        }
+        set(value) = prefs.edit().putString(KEY_NOTES_ROOT_DIR, value).apply()
 
     var dailyAlias: String
         get() = prefs.getString(KEY_DAILY_ALIAS, "Daily List") ?: "Daily List"
@@ -66,6 +133,14 @@ class StorageManager(private val context: Context) {
         return File(calendarFilePath)
     }
 
+    fun getNotesRootFolder(): File {
+        val dir = File(notesRootDir)
+        if (!dir.exists()) {
+            dir.mkdirs()
+        }
+        return dir
+    }
+
     fun readText(file: File): String {
         return try {
             if (file.exists()) file.readText(Charsets.UTF_8) else ""
@@ -90,7 +165,7 @@ class StorageManager(private val context: Context) {
         val file = getTodayFile()
         if (!file.exists() || file.length() == 0L) {
             val dateStr = getTodayDateString()
-            val initial = "# $dateStr\n\n- [ ] Important task today\n"
+            val initial = "# $dateStr\n\n- [ ] Ghi chú công việc hôm nay\n"
             writeText(file, initial)
         }
         return file
@@ -99,7 +174,7 @@ class StorageManager(private val context: Context) {
     fun ensureDeadlineFileExists(): File {
         val file = getDeadlineFile()
         if (!file.exists() || file.length() == 0L) {
-            val initial = "# Deadlines\n\n- [ ] Example deadline task\n"
+            val initial = "# Deadlines\n\n- [ ] Nhiệm vụ quan trọng\n"
             writeText(file, initial)
         }
         return file
@@ -151,6 +226,55 @@ class StorageManager(private val context: Context) {
             e.printStackTrace()
             false
         }
+    }
+
+    fun getFileSyncInfo(file: File): SyncStatusInfo {
+        if (!file.exists()) {
+            return SyncStatusInfo(
+                exists = false,
+                lastModified = 0L,
+                sizeBytes = 0L,
+                statusText = "Chưa có file (chờ Syncthing)",
+                isSynced = false,
+                relativeTime = "Chưa tạo"
+            )
+        }
+
+        val lastMod = file.lastModified()
+        val now = System.currentTimeMillis()
+        val diffMs = now - lastMod
+
+        val relative = when {
+            diffMs < 30_000L -> "Vừa xong"
+            diffMs < 60_000L -> "Khoảng 1 phút trước"
+            diffMs < 3600_000L -> "${diffMs / 60_000L} phút trước"
+            diffMs < 86400_000L -> "${diffMs / 3600_000L} giờ trước"
+            else -> SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date(lastMod))
+        }
+
+        val sizeStr = formatFileSize(file.length())
+        val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(lastMod))
+
+        return SyncStatusInfo(
+            exists = true,
+            lastModified = lastMod,
+            sizeBytes = file.length(),
+            statusText = "Đã đồng bộ ($relative lúc $timeStr • $sizeStr)",
+            isSynced = true,
+            relativeTime = relative
+        )
+    }
+
+    fun formatFileSize(bytes: Long): String {
+        return when {
+            bytes < 1024 -> "$bytes B"
+            bytes < 1024 * 1024 -> String.format(Locale.US, "%.1f KB", bytes / 1024.0)
+            else -> String.format(Locale.US, "%.1f MB", bytes / (1024.0 * 1024.0))
+        }
+    }
+
+    fun createDirectoryObserver(dir: File, onFileChanged: (path: String?) -> Unit): DirectoryObserver {
+        return DirectoryObserver(dir, onFileChanged)
     }
 
     fun hasStoragePermission(): Boolean {

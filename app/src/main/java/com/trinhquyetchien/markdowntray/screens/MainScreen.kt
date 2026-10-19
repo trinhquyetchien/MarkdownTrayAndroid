@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AssignmentLate
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.Icon
@@ -22,14 +23,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import com.trinhquyetchien.markdowntray.data.StorageManager
-
-enum class TrayTab(val title: String) {
-    TODAY("Today"),
-    CALENDAR("Calendar"),
-    DEADLINE("Deadline"),
-    SETTINGS("Settings")
-}
 
 @Composable
 fun MainScreen(
@@ -45,19 +40,20 @@ fun MainScreen(
                 containerColor = MaterialTheme.colorScheme.surface,
                 contentColor = MaterialTheme.colorScheme.onSurface
             ) {
-                // Today Tab
+                // 1. Today Tab
                 NavigationBarItem(
                     selected = selectedTabIndex == 0,
                     onClick = { selectedTabIndex = 0 },
                     icon = {
                         Icon(
                             imageVector = Icons.Default.Today,
-                            contentDescription = "Today"
+                            contentDescription = "Hôm nay"
                         )
                     },
                     label = {
                         Text(
-                            text = "Today",
+                            text = "Hôm nay",
+                            fontSize = 11.sp,
                             fontWeight = if (selectedTabIndex == 0) FontWeight.Bold else FontWeight.Normal
                         )
                     },
@@ -68,19 +64,20 @@ fun MainScreen(
                     )
                 )
 
-                // Calendar Tab
+                // 2. Calendar Tab
                 NavigationBarItem(
                     selected = selectedTabIndex == 1,
                     onClick = { selectedTabIndex = 1 },
                     icon = {
                         Icon(
                             imageVector = Icons.Default.CalendarMonth,
-                            contentDescription = "Calendar"
+                            contentDescription = "Lịch"
                         )
                     },
                     label = {
                         Text(
-                            text = "Calendar",
+                            text = "Lịch",
+                            fontSize = 11.sp,
                             fontWeight = if (selectedTabIndex == 1) FontWeight.Bold else FontWeight.Normal
                         )
                     },
@@ -91,7 +88,7 @@ fun MainScreen(
                     )
                 )
 
-                // Deadline Tab
+                // 3. Deadline Tab
                 NavigationBarItem(
                     selected = selectedTabIndex == 2,
                     onClick = { selectedTabIndex = 2 },
@@ -104,6 +101,7 @@ fun MainScreen(
                     label = {
                         Text(
                             text = "Deadline",
+                            fontSize = 11.sp,
                             fontWeight = if (selectedTabIndex == 2) FontWeight.Bold else FontWeight.Normal
                         )
                     },
@@ -114,20 +112,45 @@ fun MainScreen(
                     )
                 )
 
-                // Settings Tab
+                // 4. Notes List Tab (5th Menu)
                 NavigationBarItem(
                     selected = selectedTabIndex == 3,
                     onClick = { selectedTabIndex = 3 },
                     icon = {
                         Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings"
+                            imageVector = Icons.Default.FolderOpen,
+                            contentDescription = "List"
                         )
                     },
                     label = {
                         Text(
-                            text = "Settings",
+                            text = "List",
+                            fontSize = 11.sp,
                             fontWeight = if (selectedTabIndex == 3) FontWeight.Bold else FontWeight.Normal
+                        )
+                    },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                        selectedTextColor = MaterialTheme.colorScheme.primary,
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                )
+
+                // 5. Settings Tab
+                NavigationBarItem(
+                    selected = selectedTabIndex == 4,
+                    onClick = { selectedTabIndex = 4 },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Cài đặt"
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = "Cài đặt",
+                            fontSize = 11.sp,
+                            fontWeight = if (selectedTabIndex == 4) FontWeight.Bold else FontWeight.Normal
                         )
                     },
                     colors = NavigationBarItemDefaults.colors(
@@ -148,7 +171,8 @@ fun MainScreen(
                 0 -> TodayScreen(storageManager = storageManager)
                 1 -> CalendarScreen(storageManager = storageManager)
                 2 -> DeadlineScreen(storageManager = storageManager)
-                3 -> SettingsScreen(storageManager = storageManager)
+                3 -> NotesListScreen(storageManager = storageManager)
+                4 -> SettingsScreen(storageManager = storageManager)
             }
         }
     }

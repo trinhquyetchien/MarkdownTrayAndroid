@@ -3,37 +3,30 @@ package com.trinhquyetchien.markdowntray.screens
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Today
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import com.trinhquyetchien.markdowntray.data.StorageManager
+import com.trinhquyetchien.markdowntray.data.SyncStatusInfo
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -51,24 +44,45 @@ fun TodayScreen(
     var selectedCalendar by remember { mutableStateOf(calendar.clone() as Calendar) }
 
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
-    val displayFormat = remember { SimpleDateFormat("EEE, dd MMM yyyy", Locale.getDefault()) }
+    val displayFormat = remember { SimpleDateFormat("EEEE, dd/MM/yyyy", Locale.forLanguageTag("vi-VN")) }
     val todayDateStr = remember { dateFormat.format(Date()) }
 
     var selectedDateStr by remember { mutableStateOf(dateFormat.format(selectedCalendar.time)) }
     var rawContent by remember { mutableStateOf("") }
     var currentFile by remember { mutableStateOf(File(storageManager.dailyNotesDir, "$selectedDateStr.md")) }
+    var syncInfo by remember { mutableStateOf<SyncStatusInfo?>(null) }
 
     fun loadContent() {
         currentFile = File(storageManager.dailyNotesDir, "$selectedDateStr.md")
-        if (currentFile.exists()) {
-            rawContent = storageManager.readText(currentFile)
-        } else {
-            rawContent = ""
+        if (selectedDateStr == todayDateStr && (!currentFile.exists() || currentFile.length() == 0L)) {
+            // Tự động khởi tạo file ngày hôm nay nếu chưa có
+            currentFile = storageManager.ensureTodayFileExists()
         }
+
+        rawContent = if (currentFile.exists()) {
+            storageManager.readText(currentFile)
+        } else {
+            ""
+        }
+        syncInfo = storageManager.getFileSyncInfo(currentFile)
     }
 
     LaunchedEffect(selectedDateStr, storageManager.dailyNotesDir) {
         loadContent()
+    }
+
+    // Auto-reload via DirectoryObserver when Syncthing syncs files into the daily folder
+    DisposableEffect(storageManager.dailyNotesDir) {
+        val dir = File(storageManager.dailyNotesDir)
+        val observer = storageManager.createDirectoryObserver(dir) { changedPath ->
+            if (changedPath == null || changedPath == "$selectedDateStr.md") {
+                loadContent()
+            }
+        }
+        observer.start()
+        onDispose {
+            observer.stop()
+        }
     }
 
     val isViewingToday = selectedDateStr == todayDateStr
@@ -83,14 +97,14 @@ fun TodayScreen(
                         style = MaterialTheme.typography.titleLarge
                     )
                     Text(
-                        text = displayFormat.format(selectedCalendar.time),
+                        text = displayFormat.format(selectedCalendar.time).replaceFirstChar { it.uppercase() },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             },
             actions = {
-                // Previous Day
+                // Hôm trước
                 IconButton(onClick = {
                     selectedCalendar.add(Calendar.DAY_OF_YEAR, -1)
                     selectedCalendar = selectedCalendar.clone() as Calendar
@@ -98,11 +112,11 @@ fun TodayScreen(
                 }) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Previous Day"
+                        contentDescription = "Ngày trước"
                     )
                 }
 
-                // Jump to Today button if not on today
+                // Nút quay về Hôm nay nếu đang xem ngày khác
                 if (!isViewingToday) {
                     IconButton(onClick = {
                         selectedCalendar = Calendar.getInstance()
@@ -110,13 +124,13 @@ fun TodayScreen(
                     }) {
                         Icon(
                             imageVector = Icons.Default.Today,
-                            contentDescription = "Go to Today",
+                            contentDescription = "Hôm nay",
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
 
-                // Next Day
+                // Hôm sau
                 IconButton(onClick = {
                     selectedCalendar.add(Calendar.DAY_OF_YEAR, 1)
                     selectedCalendar = selectedCalendar.clone() as Calendar
@@ -124,7 +138,7 @@ fun TodayScreen(
                 }) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = "Next Day"
+                        contentDescription = "Ngày sau"
                     )
                 }
             },
@@ -134,37 +148,38 @@ fun TodayScreen(
         )
 
         MarkdownViewer(
-            title = if (isViewingToday) "Today ($selectedDateStr)" else selectedDateStr,
+            title = if (isViewingToday) "Hôm nay ($selectedDateStr)" else selectedDateStr,
             rawContent = rawContent,
+            syncInfo = syncInfo,
             onToggleTask = { lineIndex, isChecked ->
                 val success = storageManager.toggleTask(currentFile, lineIndex, isChecked)
                 if (success) {
                     loadContent()
                 } else {
-                    Toast.makeText(context, "Failed to update task", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Không thể cập nhật task", Toast.LENGTH_SHORT).show()
                 }
             },
             onAddTask = { taskText ->
                 val success = storageManager.appendTask(currentFile, taskText)
                 if (success) {
                     loadContent()
-                    Toast.makeText(context, "Task added", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Đã thêm công việc", Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(context, "Failed to add task", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Lỗi thêm task", Toast.LENGTH_SHORT).show()
                 }
             },
             onSaveRawContent = { newContent ->
                 val success = storageManager.writeText(currentFile, newContent)
                 if (success) {
                     loadContent()
-                    Toast.makeText(context, "Note saved", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Đã lưu ghi chú", Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(context, "Failed to save note", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Lỗi lưu ghi chú", Toast.LENGTH_SHORT).show()
                 }
             },
             onRefresh = {
                 loadContent()
-                Toast.makeText(context, "Refreshed", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Đã kiểm tra đồng bộ", Toast.LENGTH_SHORT).show()
             },
             modifier = Modifier.weight(1f)
         )
