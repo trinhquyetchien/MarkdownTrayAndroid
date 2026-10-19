@@ -111,12 +111,26 @@ fun CalendarScreen(
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
     var syncInfo by remember { mutableStateOf<SyncStatusInfo?>(null) }
 
+    fun buildInjectedHtml(): String {
+        val baseHtml = try {
+            context.assets.open("calendar.html").bufferedReader().use { it.readText() }
+        } catch (e: Exception) {
+            Log.e("CalendarScreen", "Could not load calendar.html from assets", e)
+            ""
+        }
+        val file = storageManager.getCalendarFile()
+        val json = if (file.exists()) file.readText(Charsets.UTF_8).trim() else "[]"
+        val jsSafeJson = JSONObject.quote(json)
+        val injection = "try { loadData($jsSafeJson); } catch(e){ console.error('Initial loadData error', e); }"
+        return baseHtml.replace("/* __INITIAL_EVENTS_DATA__ */", injection)
+    }
+
     fun refreshCalendar() {
         val file = storageManager.getCalendarFile()
         syncInfo = storageManager.getFileSyncInfo(file)
         val json = if (file.exists()) file.readText(Charsets.UTF_8).trim() else "[]"
         val jsSafeJson = JSONObject.quote(json)
-        webViewRef?.evaluateJavascript("loadData($jsSafeJson);", null)
+        webViewRef?.evaluateJavascript("if (typeof loadData === 'function') { loadData($jsSafeJson); }", null)
     }
 
     LaunchedEffect(storageManager.calendarFilePath) {
@@ -211,6 +225,8 @@ fun CalendarScreen(
                         settings.domStorageEnabled = true
                         settings.allowFileAccess = true
                         settings.allowContentAccess = true
+                        settings.allowFileAccessFromFileURLs = true
+                        settings.allowUniversalAccessFromFileURLs = true
                         settings.useWideViewPort = true
                         settings.loadWithOverviewMode = true
                         settings.builtInZoomControls = true
@@ -231,12 +247,13 @@ fun CalendarScreen(
                                 syncInfo = storageManager.getFileSyncInfo(file)
                                 val json = if (file.exists()) file.readText(Charsets.UTF_8).trim() else "[]"
                                 val jsSafeJson = JSONObject.quote(json)
-                                view?.evaluateJavascript("loadData($jsSafeJson);", null)
+                                view?.evaluateJavascript("if (typeof loadData === 'function') { loadData($jsSafeJson); }", null)
                             }
                         }
 
                         addJavascriptInterface(bridge, "AndroidBridge")
-                        loadUrl("file:///android_asset/calendar.html")
+                        val injectedHtml = buildInjectedHtml()
+                        loadDataWithBaseURL("file:///android_asset/", injectedHtml, "text/html", "UTF-8", null)
                         webViewRef = this
                     }
                 },
