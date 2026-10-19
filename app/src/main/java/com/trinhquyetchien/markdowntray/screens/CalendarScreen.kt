@@ -3,8 +3,12 @@ package com.trinhquyetchien.markdowntray.screens
 import android.annotation.SuppressLint
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
+import android.view.ViewGroup
+import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
@@ -197,6 +201,12 @@ fun CalendarScreen(
             AndroidView(
                 factory = { ctx ->
                     WebView(ctx).apply {
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                        setBackgroundColor(android.graphics.Color.parseColor("#1c1c1e"))
+
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
                         settings.allowFileAccess = true
@@ -205,8 +215,15 @@ fun CalendarScreen(
                         settings.loadWithOverviewMode = true
                         settings.builtInZoomControls = true
                         settings.displayZoomControls = false
+                        settings.cacheMode = WebSettings.LOAD_NO_CACHE
 
-                        webChromeClient = WebChromeClient()
+                        webChromeClient = object : WebChromeClient() {
+                            override fun onConsoleMessage(cm: ConsoleMessage?): Boolean {
+                                Log.d("CalendarWebView", "${cm?.message()} -- line ${cm?.lineNumber()}")
+                                return super.onConsoleMessage(cm)
+                            }
+                        }
+
                         webViewClient = object : WebViewClient() {
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 super.onPageFinished(view, url)
@@ -222,6 +239,9 @@ fun CalendarScreen(
                         loadUrl("file:///android_asset/calendar.html")
                         webViewRef = this
                     }
+                },
+                update = { webView ->
+                    webViewRef = webView
                 },
                 modifier = Modifier.fillMaxSize()
             )

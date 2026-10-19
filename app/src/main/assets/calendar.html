@@ -181,6 +181,33 @@
         z-index: 5;
       }
 
+      .time-slot {
+        height: 60px;
+        border-bottom: 1px solid transparent;
+        text-align: right;
+        padding-right: 10px;
+        font-size: 11px;
+        color: var(--text-muted);
+        position: relative;
+        font-weight: 500;
+        box-sizing: border-box;
+      }
+
+      .time-slot::after {
+        content: "";
+        position: absolute;
+        right: 0;
+        top: 0;
+        border-bottom: 1px solid var(--border-color);
+        width: 8px;
+      }
+
+      .days-container {
+        display: flex;
+        flex: 1;
+        position: relative;
+      }
+
       .day-col {
         flex: 1;
         position: relative;
@@ -890,15 +917,26 @@
       function loadData(eventsJson) {
         if (eventsJson) {
           try {
-            events = JSON.parse(eventsJson);
+            if (typeof eventsJson === "string") {
+              events = JSON.parse(eventsJson);
+              if (typeof events === "string") {
+                events = JSON.parse(events);
+              }
+            } else if (Array.isArray(eventsJson)) {
+              events = eventsJson;
+            }
           } catch (e) {
+            console.error("Error parsing eventsJson", e);
             events = [];
           }
+        }
+        if (!Array.isArray(events)) {
+          events = [];
         }
         renderCalendar();
         setTimeout(() => {
           const scrollArea = document.getElementById("scroll-area");
-          if (scrollArea.scrollTop === 0)
+          if (scrollArea && scrollArea.scrollTop === 0)
             scrollArea.scrollTop = 8 * PIXELS_PER_HOUR - 100;
         }, 50);
       }
@@ -2446,16 +2484,21 @@
         }
       });
 
-      // Auto load for Android WebView
+      // Auto load for Android WebView or initial render
+      var hasLoadedData = false;
       if (window.AndroidBridge && window.AndroidBridge.getEventsJson) {
         try {
           const initJson = window.AndroidBridge.getEventsJson();
           if (initJson) {
             loadData(initJson);
+            hasLoadedData = true;
           }
         } catch (e) {
           console.error("Failed to load initial events from AndroidBridge", e);
         }
+      }
+      if (!hasLoadedData) {
+        renderCalendar();
       }
     </script>
   </body>
