@@ -321,6 +321,21 @@
         z-index: 30;
       }
 
+      .event.touch-dragging {
+        opacity: 0.25 !important;
+        transform: scale(0.96);
+      }
+
+      #touch-drag-floating-ghost {
+        position: fixed !important;
+        z-index: 999999 !important;
+        pointer-events: none !important;
+        opacity: 0.94 !important;
+        transform: scale(1.05) !important;
+        box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55) !important;
+        will-change: transform, left, top;
+      }
+
       .event-title {
         font-weight: 600;
         margin-bottom: 3px;
@@ -350,12 +365,27 @@
         bottom: 0;
         left: 0;
         right: 0;
-        height: 6px;
+        height: 12px;
         cursor: ns-resize;
         z-index: 10;
+        touch-action: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .event-resizer::after {
+        content: "";
+        display: block;
+        width: 24px;
+        height: 3px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.4);
       }
       .event-resizer:hover {
-        background: rgba(255, 255, 255, 0.3);
+        background: rgba(255, 255, 255, 0.2);
+      }
+      .event-resizer:hover::after {
+        background: rgba(255, 255, 255, 0.8);
       }
 
       .repeat-days {
@@ -1037,67 +1067,110 @@
       let resizingOriginalEndStr = null;
       let resizingCurrentDurationMs = null;
 
+      function handleResizeMove(clientX, clientY) {
+        if (!isResizing || !resizingEvent) return;
+        const dayCols = Array.from(document.querySelectorAll("#days-bg .day-col"));
+        let targetCol = null;
+        for (const col of dayCols) {
+          const r = col.getBoundingClientRect();
+          if (clientX >= r.left && clientX < r.right) {
+            targetCol = col;
+            break;
+          }
+        }
+        if (!targetCol && dayCols.length > 0) {
+          const firstR = dayCols[0].getBoundingClientRect();
+          const lastR = dayCols[dayCols.length - 1].getBoundingClientRect();
+          if (clientX < firstR.left) targetCol = dayCols[0];
+          else if (clientX >= lastR.left) targetCol = dayCols[dayCols.length - 1];
+        }
+
+        if (targetCol && resizingOccurrenceStart) {
+          const rect = targetCol.getBoundingClientRect();
+          const targetDateStr = targetCol.dataset.date;
+          let y = clientY - rect.top;
+          y = Math.max(0, Math.min(y, 24 * PIXELS_PER_HOUR));
+
+          let hour = Math.floor(y / PIXELS_PER_HOUR);
+          let min = Math.floor(((y % PIXELS_PER_HOUR) / PIXELS_PER_HOUR) * 60);
+          min = Math.round(min / 15) * 15;
+          if (min === 60) {
+            hour++;
+            min = 0;
+          }
+          if (hour >= 24) {
+            hour = 24;
+            min = 0;
+          }
+
+          let candidateEnd = new Date(targetDateStr + "T00:00:00");
+          if (hour === 24) {
+            candidateEnd.setDate(candidateEnd.getDate() + 1);
+            candidateEnd.setHours(0, 0, 0, 0);
+          } else {
+            candidateEnd.setHours(hour, min, 0, 0);
+          }
+
+          const minDurationMs = 15 * 60 * 1000;
+          if (candidateEnd.getTime() - resizingOccurrenceStart.getTime() < minDurationMs) {
+            candidateEnd = new Date(resizingOccurrenceStart.getTime() + minDurationMs);
+          }
+
+          const newDurationMs = candidateEnd.getTime() - resizingOccurrenceStart.getTime();
+          resizingCurrentDurationMs = newDurationMs;
+
+          const baseStart = new Date(resizingEvent.start);
+          const newAnchorEnd = new Date(baseStart.getTime() + newDurationMs);
+          const newEndStr = formatDateYMD(newAnchorEnd) + "T" + String(newAnchorEnd.getHours()).padStart(2, '0') + ":" + String(newAnchorEnd.getMinutes()).padStart(2, '0') + ":00";
+
+          if (resizingEvent.end !== newEndStr) {
+            resizingEvent.end = newEndStr;
+            renderCalendar();
+          }
+        }
+      }
+
+      function handleResizeEnd() {
+        if (!isResizing) return;
+        isResizing = false;
+        const ev = resizingEvent;
+        const occDate = resizingOccurrenceDate;
+        const origEndStr = resizingOriginalEndStr;
+        const finalEndStr = ev ? ev.end : null;
+        const finalDurationMs = resizingCurrentDurationMs;
+
+        resizingEvent = null;
+        resizingOccurrenceDate = null;
+        resizingOccurrenceStart = null;
+        resizingOriginalEndStr = null;
+        resizingCurrentDurationMs = null;
+        document.body.style.cursor = '';
+
+        if (!ev || origEndStr === finalEndStr) {
+          return;
+        }
+
+        if (ev.repeatDays && ev.repeatDays.length > 0) {
+          ev.end = origEndStr;
+          renderCalendar();
+
+          openRecurringConfirm({
+            action: "resize",
+            ev: ev,
+            occurrenceDate: occDate,
+            origEndStr: origEndStr,
+            finalEndStr: finalEndStr,
+            newDurationMs: finalDurationMs
+          });
+          return;
+        }
+
+        saveEvents();
+      }
+
       document.addEventListener("mousemove", (e) => {
         if (isResizing && resizingEvent) {
-          const dayCols = Array.from(document.querySelectorAll("#days-bg .day-col"));
-          let targetCol = null;
-          for (const col of dayCols) {
-            const r = col.getBoundingClientRect();
-            if (e.clientX >= r.left && e.clientX < r.right) {
-              targetCol = col;
-              break;
-            }
-          }
-          if (!targetCol && dayCols.length > 0) {
-            const firstR = dayCols[0].getBoundingClientRect();
-            const lastR = dayCols[dayCols.length - 1].getBoundingClientRect();
-            if (e.clientX < firstR.left) targetCol = dayCols[0];
-            else if (e.clientX >= lastR.left) targetCol = dayCols[dayCols.length - 1];
-          }
-
-          if (targetCol && resizingOccurrenceStart) {
-            const rect = targetCol.getBoundingClientRect();
-            const targetDateStr = targetCol.dataset.date;
-            let y = e.clientY - rect.top;
-            y = Math.max(0, Math.min(y, 24 * PIXELS_PER_HOUR));
-
-            let hour = Math.floor(y / PIXELS_PER_HOUR);
-            let min = Math.floor(((y % PIXELS_PER_HOUR) / PIXELS_PER_HOUR) * 60);
-            min = Math.round(min / 15) * 15;
-            if (min === 60) {
-              hour++;
-              min = 0;
-            }
-            if (hour >= 24) {
-              hour = 24;
-              min = 0;
-            }
-
-            let candidateEnd = new Date(targetDateStr + "T00:00:00");
-            if (hour === 24) {
-              candidateEnd.setDate(candidateEnd.getDate() + 1);
-              candidateEnd.setHours(0, 0, 0, 0);
-            } else {
-              candidateEnd.setHours(hour, min, 0, 0);
-            }
-
-            const minDurationMs = 15 * 60 * 1000;
-            if (candidateEnd.getTime() - resizingOccurrenceStart.getTime() < minDurationMs) {
-              candidateEnd = new Date(resizingOccurrenceStart.getTime() + minDurationMs);
-            }
-
-            const newDurationMs = candidateEnd.getTime() - resizingOccurrenceStart.getTime();
-            resizingCurrentDurationMs = newDurationMs;
-
-            const baseStart = new Date(resizingEvent.start);
-            const newAnchorEnd = new Date(baseStart.getTime() + newDurationMs);
-            const newEndStr = formatDateYMD(newAnchorEnd) + "T" + String(newAnchorEnd.getHours()).padStart(2, '0') + ":" + String(newAnchorEnd.getMinutes()).padStart(2, '0') + ":00";
-
-            if (resizingEvent.end !== newEndStr) {
-              resizingEvent.end = newEndStr;
-              renderCalendar();
-            }
-          }
+          handleResizeMove(e.clientX, e.clientY);
           return;
         }
 
@@ -1207,40 +1280,7 @@
 
       document.addEventListener("mouseup", (e) => {
         if (isResizing) {
-          isResizing = false;
-          const ev = resizingEvent;
-          const occDate = resizingOccurrenceDate;
-          const origEndStr = resizingOriginalEndStr;
-          const finalEndStr = ev ? ev.end : null;
-          const finalDurationMs = resizingCurrentDurationMs;
-
-          resizingEvent = null;
-          resizingOccurrenceDate = null;
-          resizingOccurrenceStart = null;
-          resizingOriginalEndStr = null;
-          resizingCurrentDurationMs = null;
-          document.body.style.cursor = '';
-
-          if (!ev || origEndStr === finalEndStr) {
-            return;
-          }
-
-          if (ev.repeatDays && ev.repeatDays.length > 0) {
-            ev.end = origEndStr;
-            renderCalendar();
-
-            openRecurringConfirm({
-              action: "resize",
-              ev: ev,
-              occurrenceDate: occDate,
-              origEndStr: origEndStr,
-              finalEndStr: finalEndStr,
-              newDurationMs: finalDurationMs
-            });
-            return;
-          }
-
-          saveEvents();
+          handleResizeEnd();
           return;
         }
 
@@ -1259,10 +1299,201 @@
           const durationMs = dtEnd.getTime() - dtStart.getTime();
           if (durationMs >= 10 * 60 * 1000) {
             openModalForNewWithDates(dtStart, dtEnd);
+          } else {
+            const dtEndDefault = new Date(dtStart.getTime() + 60 * 60 * 1000);
+            openModalForNewWithDates(dtStart, dtEndDefault);
           }
           return;
         }
       });
+
+      document.addEventListener("touchmove", (e) => {
+        if (isResizing && e.touches.length === 1) {
+          if (e.cancelable) e.preventDefault();
+          handleResizeMove(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      }, { passive: false });
+
+      document.addEventListener("touchend", (e) => {
+        if (isResizing) {
+          handleResizeEnd();
+        }
+      });
+
+      var justFinishedTouchDrag = false;
+      var touchDragState = null;
+
+      function setupEventTouchDrag(evDiv, item, itemOccDate) {
+        let touchStartPos = null;
+        let longPressTimer = null;
+
+        evDiv.addEventListener("touchstart", (e) => {
+          if (e.target.closest(".event-duplicate-btn, .event-resizer")) return;
+          if (e.touches.length !== 1) return;
+          const touch = e.touches[0];
+          const rect = evDiv.getBoundingClientRect();
+          const offsetY = touch.clientY - rect.top;
+          touchStartPos = { x: touch.clientX, y: touch.clientY, offsetY: offsetY };
+
+          longPressTimer = setTimeout(() => {
+            longPressTimer = null;
+            if (window.AndroidBridge && window.AndroidBridge.vibrate) {
+              window.AndroidBridge.vibrate(45);
+            } else if (navigator.vibrate) {
+              navigator.vibrate(45);
+            }
+
+            touchDragState = {
+              active: true,
+              ev: item.ev,
+              occDate: itemOccDate,
+              evDiv: evDiv,
+              offsetY: offsetY,
+              targetCol: null,
+              targetStartH: 0,
+              targetStartM: 0
+            };
+
+            evDiv.classList.add("touch-dragging");
+
+            const ghost = evDiv.cloneNode(true);
+            ghost.id = "touch-drag-floating-ghost";
+            ghost.classList.remove("touch-dragging");
+            ghost.style.position = "fixed";
+            ghost.style.zIndex = "999999";
+            ghost.style.pointerEvents = "none";
+            ghost.style.opacity = "0.92";
+            ghost.style.transform = "scale(1.05)";
+            ghost.style.boxShadow = "0 14px 30px rgba(0,0,0,0.5)";
+            ghost.style.width = evDiv.offsetWidth + "px";
+            ghost.style.height = evDiv.offsetHeight + "px";
+            ghost.style.left = rect.left + "px";
+            ghost.style.top = (touch.clientY - offsetY) + "px";
+            document.body.appendChild(ghost);
+            touchDragState.ghostEl = ghost;
+          }, 280);
+        }, { passive: true });
+
+        evDiv.addEventListener("touchmove", (e) => {
+          if (longPressTimer && touchStartPos) {
+            const touch = e.touches[0];
+            const dx = Math.abs(touch.clientX - touchStartPos.x);
+            const dy = Math.abs(touch.clientY - touchStartPos.y);
+            if (dx > 8 || dy > 8) {
+              clearTimeout(longPressTimer);
+              longPressTimer = null;
+            }
+          }
+          if (touchDragState && touchDragState.active) {
+            if (e.cancelable) e.preventDefault();
+            e.stopPropagation();
+            const touch = e.touches[0];
+            const ghost = touchDragState.ghostEl;
+            if (ghost) {
+              ghost.style.left = (touch.clientX - ghost.offsetWidth / 2) + "px";
+              ghost.style.top = (touch.clientY - touchDragState.offsetY) + "px";
+            }
+
+            const hit = document.elementFromPoint(touch.clientX, touch.clientY);
+            const targetCol = hit ? hit.closest(".day-col:not(.day-header)") : null;
+            if (targetCol && targetCol.dataset.date) {
+              touchDragState.targetCol = targetCol;
+              const rect = targetCol.getBoundingClientRect();
+              let newY = touch.clientY - rect.top - touchDragState.offsetY;
+              newY = Math.max(0, Math.min(newY, 24 * PIXELS_PER_HOUR));
+
+              let startH = Math.floor(newY / PIXELS_PER_HOUR);
+              let startM = Math.floor(((newY % PIXELS_PER_HOUR) / PIXELS_PER_HOUR) * 60);
+              startM = Math.round(startM / 15) * 15;
+              if (startM === 60) { startH++; startM = 0; }
+              if (startH >= 24) { startH = 23; startM = 45; }
+
+              touchDragState.targetStartH = startH;
+              touchDragState.targetStartM = startM;
+
+              if (!window.dropPlaceholder) {
+                window.dropPlaceholder = document.createElement("div");
+                window.dropPlaceholder.className = "drag-ghost";
+                window.dropPlaceholder.innerHTML = '<div class="drag-ghost-title" style="padding: 6px 8px; color: white; font-weight: 600; font-size: 13px; text-shadow: 0 1px 2px rgba(0,0,0,0.8);"></div>';
+              }
+              if (window.dropPlaceholder.parentElement !== targetCol) {
+                targetCol.appendChild(window.dropPlaceholder);
+              }
+              const durationMs = new Date(item.ev.end).getTime() - new Date(item.ev.start).getTime();
+              const height = (durationMs / (1000 * 60 * 60)) * PIXELS_PER_HOUR;
+              const snappedTop = (startH + startM / 60) * PIXELS_PER_HOUR;
+              window.dropPlaceholder.style.top = snappedTop + "px";
+              window.dropPlaceholder.style.height = height + "px";
+              window.dropPlaceholder.style.display = "block";
+
+              const titleEl = window.dropPlaceholder.querySelector('.drag-ghost-title');
+              if (titleEl) {
+                const sH = String(startH).padStart(2, '0');
+                const sM = String(startM).padStart(2, '0');
+                titleEl.innerHTML = `${sH}:${sM} - ${escapeHtml(item.ev.title || 'Task')}`;
+              }
+            }
+          }
+        }, { passive: false });
+
+        const endTouchDrag = (e) => {
+          if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+          }
+          if (touchDragState && touchDragState.active) {
+            if (e.cancelable) e.preventDefault();
+            e.stopPropagation();
+            justFinishedTouchDrag = true;
+            setTimeout(() => { justFinishedTouchDrag = false; }, 350);
+
+            const targetCol = touchDragState.targetCol;
+            const startH = touchDragState.targetStartH;
+            const startM = touchDragState.targetStartM;
+            const ev = touchDragState.ev;
+            const sourceDate = touchDragState.occDate || ev.start.substring(0, 10);
+
+            if (targetCol && targetCol.dataset.date) {
+              const targetDate = targetCol.dataset.date;
+              const durationMs = new Date(ev.end).getTime() - new Date(ev.start).getTime();
+              const newStartStr = targetDate + "T" + String(startH).padStart(2, "0") + ":" + String(startM).padStart(2, "0") + ":00";
+              const newStart = new Date(newStartStr);
+              const newEnd = new Date(newStart.getTime() + durationMs);
+              const newEndStr = formatDateYMD(newEnd) + "T" + String(newEnd.getHours()).padStart(2, "0") + ":" + String(newEnd.getMinutes()).padStart(2, "0") + ":00";
+
+              if (ev.repeatDays && ev.repeatDays.length > 0) {
+                const origTime = ev.start.substring(11, 16);
+                const newTime = String(startH).padStart(2, "0") + ":" + String(startM).padStart(2, "0");
+                if (sourceDate !== targetDate || origTime !== newTime) {
+                  openRecurringConfirm({
+                    action: "drag",
+                    ev: ev,
+                    occurrenceDate: sourceDate,
+                    targetDate: targetDate,
+                    newStartStr: newStartStr,
+                    newEndStr: newEndStr,
+                    newStartTime: newTime,
+                    newEndTime: String(newEnd.getHours()).padStart(2, '0') + ":" + String(newEnd.getMinutes()).padStart(2, '0')
+                  });
+                }
+              } else {
+                ev.start = newStartStr;
+                ev.end = newEndStr;
+                saveEvents();
+                renderCalendar();
+              }
+            }
+
+            if (touchDragState.ghostEl) touchDragState.ghostEl.remove();
+            if (window.dropPlaceholder) window.dropPlaceholder.style.display = "none";
+            if (touchDragState.evDiv) touchDragState.evDiv.classList.remove("touch-dragging");
+            touchDragState = null;
+          }
+        };
+
+        evDiv.addEventListener("touchend", endTouchDrag);
+        evDiv.addEventListener("touchcancel", endTouchDrag);
+      }
 
       function renderCalendar() {
         const startOfWeek = getStartOfWeek(currentDate);
@@ -1362,6 +1593,55 @@
             dStart.setHours(startH, startM, 0, 0);
             dragCreateCurrentStart = dStart;
             dragCreateCurrentEnd = dStart;
+          });
+
+          // Tap on empty space on mobile to quickly create event
+          let colTouchStart = null;
+          col.addEventListener("touchstart", (e) => {
+            if (e.target.closest(".event")) return;
+            if (e.touches.length === 1) {
+              colTouchStart = {
+                x: e.touches[0].clientX,
+                y: e.touches[0].clientY,
+                time: Date.now()
+              };
+            }
+          }, { passive: true });
+
+          col.addEventListener("touchend", (e) => {
+            if (window.justFinishedTouchDrag) return;
+            if (!colTouchStart) return;
+            if (e.target.closest(".event")) {
+              colTouchStart = null;
+              return;
+            }
+            const touch = e.changedTouches[0];
+            const dx = Math.abs(touch.clientX - colTouchStart.x);
+            const dy = Math.abs(touch.clientY - colTouchStart.y);
+            const dt = Date.now() - colTouchStart.time;
+            colTouchStart = null;
+
+            if (dx < 14 && dy < 14 && dt < 350) {
+              const rect = col.getBoundingClientRect();
+              let y = touch.clientY - rect.top;
+              const step = PIXELS_PER_HOUR / 4;
+              y = Math.round(y / step) * step;
+              y = Math.max(0, Math.min(y, 23 * PIXELS_PER_HOUR));
+
+              let startH = Math.floor(y / PIXELS_PER_HOUR);
+              let startM = Math.floor(((y % PIXELS_PER_HOUR) / PIXELS_PER_HOUR) * 60);
+              startM = Math.round(startM / 15) * 15;
+              if (startM === 60) {
+                startH++;
+                startM = 0;
+              }
+              if (startH >= 24) startH = 23;
+
+              const dStart = new Date(dateStr + "T00:00:00");
+              dStart.setHours(startH, startM, 0, 0);
+              const dEnd = new Date(dStart.getTime() + 60 * 60 * 1000);
+              openModalForNewWithDates(dStart, dEnd);
+            }
           });
 
           col.addEventListener("dragover", (e) => {
@@ -1689,9 +1969,7 @@
 
             const resizerEl = evDiv.querySelector('.event-resizer');
             if (resizerEl) {
-              resizerEl.addEventListener("mousedown", (e) => {
-                e.stopPropagation();
-                e.preventDefault();
+              const startResize = (clientY) => {
                 isResizing = true;
                 resizingEvent = item.ev;
                 resizingOccurrenceDate = itemOccDate;
@@ -1700,7 +1978,20 @@
                 resizingCurrentDurationMs = currentEnd.getTime() - resizingOccurrenceStart.getTime();
                 resizingOriginalEndStr = item.ev.end;
                 document.body.style.cursor = 'ns-resize';
+              };
+
+              resizerEl.addEventListener("mousedown", (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                startResize(e.clientY);
               });
+
+              resizerEl.addEventListener("touchstart", (e) => {
+                if (e.touches.length !== 1) return;
+                e.stopPropagation();
+                e.preventDefault();
+                startResize(e.touches[0].clientY);
+              }, { passive: false });
             }
 
             evDiv.addEventListener("mouseenter", () => {
@@ -1715,9 +2006,13 @@
             });
             evDiv.addEventListener("mousedown", (e) => e.stopPropagation());
             evDiv.addEventListener("click", (e) => {
+              if (justFinishedTouchDrag) return;
               e.stopPropagation();
               openModalForEdit(item.ev, itemOccDate);
             });
+
+            // Touch Drag & Drop for Mobile
+            setupEventTouchDrag(evDiv, item, itemOccDate);
             evDiv.addEventListener("dragstart", (e) => {
               window.currentDraggingEventId = item.ev.id;
               window.currentDraggingEventDate = itemOccDate;

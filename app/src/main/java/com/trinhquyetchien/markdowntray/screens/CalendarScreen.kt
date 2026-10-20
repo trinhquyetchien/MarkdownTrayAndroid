@@ -1,8 +1,13 @@
 package com.trinhquyetchien.markdowntray.screens
 
 import android.annotation.SuppressLint
+import android.content.Context
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.util.Log
 import android.view.ViewGroup
 import android.webkit.ConsoleMessage
@@ -55,10 +60,35 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class CalendarWebBridge(
+    private val context: Context,
     private val storageManager: StorageManager,
     private val onDataSaved: () -> Unit
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    @Suppress("DEPRECATION")
+    @JavascriptInterface
+    fun vibrate(durationMs: Long) {
+        mainHandler.post {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                    vibratorManager?.defaultVibrator?.vibrate(
+                        VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE)
+                    )
+                } else {
+                    val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        vibrator?.vibrate(VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE))
+                    } else {
+                        vibrator?.vibrate(durationMs)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
 
     @JavascriptInterface
     fun getEventsJson(): String {
@@ -153,8 +183,9 @@ fun CalendarScreen(
     }
 
     val bridge = remember {
-        CalendarWebBridge(storageManager) {
+        CalendarWebBridge(context, storageManager) {
             syncInfo = storageManager.getFileSyncInfo(storageManager.getCalendarFile())
+            com.trinhquyetchien.markdowntray.alarm.CalendarAlarmScheduler.scheduleUpcomingAlarms(context, storageManager)
             Toast.makeText(context, "Đã lưu lịch biểu", Toast.LENGTH_SHORT).show()
         }
     }
@@ -221,11 +252,14 @@ fun CalendarScreen(
                         )
                         setBackgroundColor(android.graphics.Color.parseColor("#1c1c1e"))
 
+                        isHapticFeedbackEnabled = true
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
                         settings.allowFileAccess = true
                         settings.allowContentAccess = true
+                        @Suppress("DEPRECATION")
                         settings.allowFileAccessFromFileURLs = true
+                        @Suppress("DEPRECATION")
                         settings.allowUniversalAccessFromFileURLs = true
                         settings.useWideViewPort = true
                         settings.loadWithOverviewMode = true

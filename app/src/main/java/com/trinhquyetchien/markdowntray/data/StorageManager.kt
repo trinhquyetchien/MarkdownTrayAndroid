@@ -24,6 +24,11 @@ data class SyncStatusInfo(
     val relativeTime: String
 )
 
+data class CustomMenuEntry(
+    val name: String,
+    val path: String
+)
+
 class DirectoryObserver(
     private val directory: File,
     private val onFileChanged: (path: String?) -> Unit
@@ -79,11 +84,13 @@ class StorageManager(private val context: Context) {
         private const val KEY_DEADLINE_ALIAS = "key_deadline_alias"
         private const val KEY_CALENDAR_FILE = "key_calendar_file"
         private const val KEY_NOTES_ROOT_DIR = "key_notes_root_dir"
+        private const val KEY_CUSTOM_MENUS_JSON = "key_custom_menus_json"
 
         val DEFAULT_STORAGE_ROOT: String = Environment.getExternalStorageDirectory().absolutePath
         val DEFAULT_DAILY_DIR: String = "$DEFAULT_STORAGE_ROOT/Note/Daily"
         val DEFAULT_NOTES_ROOT_DIR: String = "$DEFAULT_STORAGE_ROOT/Note"
-        val DEFAULT_DEADLINE_FILE: String = "$DEFAULT_STORAGE_ROOT/Note/Daily/Deadline.md"
+        val DEFAULT_DEADLINE_FILE: String = "$DEFAULT_STORAGE_ROOT/Note/Deadline/Deadline.md"
+        val LEGACY_DEADLINE_FILE: String = "$DEFAULT_STORAGE_ROOT/Note/Daily/Deadline.md"
         val DEFAULT_CALENDAR_FILE: String = "$DEFAULT_STORAGE_ROOT/Note/calendar.json"
     }
 
@@ -126,7 +133,56 @@ class StorageManager(private val context: Context) {
     }
 
     fun getDeadlineFile(): File {
-        return File(deadlineFilePath)
+        val configured = File(deadlineFilePath)
+        if (!configured.exists() && deadlineFilePath == DEFAULT_DEADLINE_FILE) {
+            val legacy = File(LEGACY_DEADLINE_FILE)
+            if (legacy.exists()) return legacy
+        }
+        return configured
+    }
+
+    fun getCustomMenus(): List<CustomMenuEntry> {
+        return try {
+            val raw = prefs.getString(KEY_CUSTOM_MENUS_JSON, null)
+            if (raw.isNullOrEmpty()) return emptyList()
+            val array = org.json.JSONArray(raw)
+            val list = mutableListOf<CustomMenuEntry>()
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                list.add(CustomMenuEntry(obj.optString("name"), obj.optString("path")))
+            }
+            list
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    fun saveCustomMenus(menus: List<CustomMenuEntry>) {
+        try {
+            val array = org.json.JSONArray()
+            for (m in menus) {
+                val obj = org.json.JSONObject()
+                obj.put("name", m.name)
+                obj.put("path", m.path)
+                array.put(obj)
+            }
+            prefs.edit().putString(KEY_CUSTOM_MENUS_JSON, array.toString()).apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun addCustomMenu(name: String, path: String) {
+        val current = getCustomMenus().toMutableList()
+        current.removeAll { it.path == path }
+        current.add(CustomMenuEntry(name.trim(), path.trim()))
+        saveCustomMenus(current)
+    }
+
+    fun removeCustomMenu(path: String) {
+        val current = getCustomMenus().filter { it.path != path }
+        saveCustomMenus(current)
     }
 
     fun getCalendarFile(): File {
@@ -225,6 +281,75 @@ class StorageManager(private val context: Context) {
         } catch (e: Exception) {
             e.printStackTrace()
             false
+        }
+    }
+
+    fun deleteTask(file: File, lineIndex: Int): Boolean {
+        return try {
+            if (!file.exists()) return false
+            val lines = file.readLines(Charsets.UTF_8).toMutableList()
+            if (lineIndex in lines.indices) {
+                lines.removeAt(lineIndex)
+                file.writeText(lines.joinToString("\n"), Charsets.UTF_8)
+                true
+            } else false
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    fun updateTaskText(file: File, lineIndex: Int, newText: String): Boolean {
+        return try {
+            if (!file.exists()) return false
+            val lines = file.readLines(Charsets.UTF_8).toMutableList()
+            if (lineIndex in lines.indices) {
+                val oldLine = lines[lineIndex]
+                val taskRegex = Regex("^(\\s*[-*]\\s*\\[[ xX]\\]\\s*)")
+                val match = taskRegex.find(oldLine)
+                if (match != null) {
+                    lines[lineIndex] = "${match.value}${newText.trim()}"
+                    file.writeText(lines.joinToString("\n"), Charsets.UTF_8)
+                    true
+                } else false
+            } else false
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    fun createFolder(parent: File, name: String): Boolean {
+        return try {
+            val target = File(parent, name.trim())
+            if (!target.exists()) target.mkdirs() else false
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    fun deleteFileOrFolder(target: File): Boolean {
+        return try {
+            if (target.isDirectory) target.deleteRecursively() else target.delete()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    fun renameFileOrFolder(target: File, newName: String): File? {
+        return try {
+            val cleanName = newName.trim()
+            if (cleanName.isEmpty()) return null
+            val parent = target.parentFile ?: return null
+            val dest = File(parent, cleanName)
+            if (dest.exists()) return null
+            val success = target.renameTo(dest)
+            if (success) dest else null
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
         }
     }
 

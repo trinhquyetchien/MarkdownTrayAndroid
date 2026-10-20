@@ -129,6 +129,24 @@ fun DeadlineScreen(
                 loadContent()
                 Toast.makeText(context, "Đã kiểm tra đồng bộ", Toast.LENGTH_SHORT).show()
             },
+            onDeleteTask = { lineIndex ->
+                val success = storageManager.deleteTask(currentFile, lineIndex)
+                if (success) {
+                    loadContent()
+                    Toast.makeText(context, "Đã xóa deadline", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "Không thể xóa deadline", Toast.LENGTH_SHORT).show()
+                }
+            },
+            onUpdateTaskText = { lineIndex, newText ->
+                val success = storageManager.updateTaskText(currentFile, lineIndex, newText)
+                if (success) {
+                    loadContent()
+                    Toast.makeText(context, "Đã cập nhật deadline", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "Không thể cập nhật", Toast.LENGTH_SHORT).show()
+                }
+            },
             modifier = Modifier.weight(1f)
         )
     }

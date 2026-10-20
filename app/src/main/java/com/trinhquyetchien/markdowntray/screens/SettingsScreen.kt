@@ -14,8 +14,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderShared
 import androidx.compose.material.icons.filled.Lock
@@ -23,15 +26,19 @@ import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -358,6 +365,127 @@ fun SettingsScreen(
                 }
             }
 
+            // Custom Menus Section
+            var customMenuList by remember { mutableStateOf(storageManager.getCustomMenus()) }
+            var newMenuAlias by remember { mutableStateOf("") }
+            var newMenuPath by remember { mutableStateOf("") }
+            var showAddMenuDialog by remember { mutableStateOf(false) }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Bookmark, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Lối tắt thư mục tùy chỉnh",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        }
+
+                        IconButton(onClick = { showAddMenuDialog = true }) {
+                            Icon(Icons.Default.Add, contentDescription = "Thêm lối tắt", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+
+                    if (customMenuList.isEmpty()) {
+                        Text(
+                            text = "Chưa có thư mục tùy chỉnh nào được thêm.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        customMenuList.forEach { menu ->
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(text = menu.name, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                                        Text(
+                                            text = menu.path.replace(StorageManager.DEFAULT_STORAGE_ROOT, "~"),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    IconButton(onClick = {
+                                        storageManager.removeCustomMenu(menu.path)
+                                        customMenuList = storageManager.getCustomMenus()
+                                    }) {
+                                        Icon(Icons.Default.Close, contentDescription = "Xóa", tint = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (showAddMenuDialog) {
+                AlertDialog(
+                    onDismissRequest = { showAddMenuDialog = false },
+                    title = { Text("Thêm lối tắt thư mục", fontWeight = FontWeight.Bold) },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = newMenuAlias,
+                                onValueChange = { newMenuAlias = it },
+                                label = { Text("Tên hiển thị (vd: Dự án A)") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            OutlinedTextField(
+                                value = newMenuPath,
+                                onValueChange = { newMenuPath = it },
+                                label = { Text("Đường dẫn thư mục") },
+                                placeholder = { Text("${StorageManager.DEFAULT_STORAGE_ROOT}/Note/...") },
+                                singleLine = false,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                val name = newMenuAlias.trim()
+                                val path = newMenuPath.trim()
+                                if (name.isNotEmpty() && path.isNotEmpty()) {
+                                    storageManager.addCustomMenu(name, path)
+                                    customMenuList = storageManager.getCustomMenus()
+                                    newMenuAlias = ""
+                                    newMenuPath = ""
+                                    showAddMenuDialog = false
+                                }
+                            }
+                        ) {
+                            Text("Thêm", fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showAddMenuDialog = false }) {
+                            Text("Hủy")
+                        }
+                    }
+                )
+            }
+
             // Save & Reset Buttons
             Row(
                 modifier = Modifier
@@ -399,6 +527,7 @@ fun SettingsScreen(
                         storageManager.deadlineAlias = deadlineAlias.trim().ifEmpty { "Deadline" }
                         storageManager.calendarFilePath = calendarFile.trim()
 
+                        com.trinhquyetchien.markdowntray.alarm.CalendarAlarmScheduler.scheduleUpcomingAlarms(context, storageManager)
                         Toast.makeText(context, "Đã lưu cài đặt", Toast.LENGTH_SHORT).show()
                     },
                     modifier = Modifier.weight(1f)

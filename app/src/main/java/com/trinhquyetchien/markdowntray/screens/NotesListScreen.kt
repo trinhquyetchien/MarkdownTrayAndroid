@@ -23,14 +23,24 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CreateNewFolder
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -38,7 +48,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
@@ -61,13 +70,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.trinhquyetchien.markdowntray.data.MarkdownNode
-import com.trinhquyetchien.markdowntray.data.MarkdownParser
+import com.trinhquyetchien.markdowntray.data.CustomMenuEntry
 import com.trinhquyetchien.markdowntray.data.StorageManager
-import com.trinhquyetchien.markdowntray.data.SyncStatusInfo
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -82,26 +87,30 @@ fun NotesListScreen(
     var searchQuery by remember { mutableStateOf("") }
 
     var filesAndDirs by remember { mutableStateOf<List<File>>(emptyList()) }
+    var customMenus by remember { mutableStateOf(storageManager.getCustomMenus()) }
     var activeNoteFile by remember { mutableStateOf<File?>(null) }
     var showNewFileDialog by remember { mutableStateOf(false) }
+    var showNewFolderDialog by remember { mutableStateOf(false) }
+
+    var targetItemForRename by remember { mutableStateOf<File?>(null) }
+    var targetItemForDelete by remember { mutableStateOf<File?>(null) }
 
     fun refreshList() {
         if (!currentFolder.exists()) {
             currentFolder.mkdirs()
         }
         val list = currentFolder.listFiles()?.toList() ?: emptyList()
-        // Sort folders first, then files alphabetically
         filesAndDirs = list.sortedWith(
             compareBy<File> { !it.isDirectory }
                 .thenBy { it.name.lowercase(Locale.ROOT) }
         )
+        customMenus = storageManager.getCustomMenus()
     }
 
     LaunchedEffect(currentFolder) {
         refreshList()
     }
 
-    // Auto-reload on file system changes (Syncthing syncs)
     DisposableEffect(currentFolder) {
         val observer = storageManager.createDirectoryObserver(currentFolder) {
             refreshList()
@@ -114,7 +123,6 @@ fun NotesListScreen(
 
     val isAtRoot = currentFolder.absolutePath == rootFolder.absolutePath
 
-    // Handle back button when inside a subfolder
     BackHandler(enabled = !isAtRoot) {
         currentFolder.parentFile?.let { parent ->
             currentFolder = parent
@@ -162,6 +170,13 @@ fun NotesListScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showNewFolderDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.CreateNewFolder,
+                            contentDescription = "Thư mục mới",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                     IconButton(onClick = { refreshList() }) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
@@ -190,6 +205,43 @@ fun NotesListScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // Pinned Custom Folders (Shortcuts)
+            if (customMenus.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    customMenus.forEach { menu ->
+                        val targetDir = File(menu.path)
+                        val isSelected = targetDir.absolutePath == currentFolder.absolutePath
+                        AssistChip(
+                            onClick = {
+                                if (targetDir.exists() && targetDir.isDirectory) {
+                                    currentFolder = targetDir
+                                } else {
+                                    Toast.makeText(context, "Thư mục không tồn tại: ${menu.name}", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            label = { Text(menu.name, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Bookmark,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            )
+                        )
+                    }
+                }
+            }
+
             // Search Input
             OutlinedTextField(
                 value = searchQuery,
@@ -237,7 +289,7 @@ fun NotesListScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = if (searchQuery.isEmpty()) "Thư mục trống" else "Không tìm thấy file nào",
+                                text = if (searchQuery.isEmpty()) "Thư mục trống" else "Không tìm thấy mục nào",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -245,16 +297,33 @@ fun NotesListScreen(
                     }
                 } else {
                     items(filteredList, key = { it.absolutePath }) { file ->
+                        val isPinned = customMenus.any { it.path == file.absolutePath }
                         if (file.isDirectory) {
                             FolderItem(
                                 folder = file,
-                                onClick = { currentFolder = file }
+                                isPinned = isPinned,
+                                onClick = { currentFolder = file },
+                                onRename = { targetItemForRename = file },
+                                onDelete = { targetItemForDelete = file },
+                                onTogglePin = {
+                                    if (isPinned) {
+                                        storageManager.removeCustomMenu(file.absolutePath)
+                                        customMenus = storageManager.getCustomMenus()
+                                        Toast.makeText(context, "Đã bỏ ghim thư mục", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        storageManager.addCustomMenu(file.name, file.absolutePath)
+                                        customMenus = storageManager.getCustomMenus()
+                                        Toast.makeText(context, "Đã ghim thư mục", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
                             )
                         } else {
                             MarkdownFileItem(
                                 file = file,
                                 storageManager = storageManager,
-                                onClick = { activeNoteFile = file }
+                                onClick = { activeNoteFile = file },
+                                onRename = { targetItemForRename = file },
+                                onDelete = { targetItemForDelete = file }
                             )
                         }
                     }
@@ -263,7 +332,7 @@ fun NotesListScreen(
         }
     }
 
-    // New Note Dialog
+    // Dialog Create New Note
     if (showNewFileDialog) {
         var noteName by remember { mutableStateOf("") }
         AlertDialog(
@@ -316,6 +385,120 @@ fun NotesListScreen(
         )
     }
 
+    // Dialog Create New Folder
+    if (showNewFolderDialog) {
+        var folderName by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showNewFolderDialog = false },
+            title = { Text("Tạo thư mục mới", fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(
+                    value = folderName,
+                    onValueChange = { folderName = it },
+                    label = { Text("Tên thư mục") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val clean = folderName.trim()
+                        if (clean.isNotEmpty()) {
+                            val ok = storageManager.createFolder(currentFolder, clean)
+                            if (ok) {
+                                refreshList()
+                                showNewFolderDialog = false
+                                Toast.makeText(context, "Đã tạo thư mục", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Không thể tạo thư mục hoặc thư mục đã tồn tại", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                ) {
+                    Text("Tạo", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNewFolderDialog = false }) {
+                    Text("Hủy")
+                }
+            }
+        )
+    }
+
+    // Dialog Rename File/Folder
+    targetItemForRename?.let { item ->
+        var newName by remember { mutableStateOf(item.name) }
+        AlertDialog(
+            onDismissRequest = { targetItemForRename = null },
+            title = { Text("Đổi tên", fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text("Tên mới") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val clean = newName.trim()
+                        if (clean.isNotEmpty() && clean != item.name) {
+                            val renamed = storageManager.renameFileOrFolder(item, clean)
+                            if (renamed != null) {
+                                refreshList()
+                                targetItemForRename = null
+                                Toast.makeText(context, "Đã đổi tên thành công", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Lỗi đổi tên hoặc tên đã tồn tại", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                ) {
+                    Text("Lưu", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { targetItemForRename = null }) {
+                    Text("Hủy")
+                }
+            }
+        )
+    }
+
+    // Dialog Delete File/Folder Confirmation
+    targetItemForDelete?.let { item ->
+        AlertDialog(
+            onDismissRequest = { targetItemForDelete = null },
+            title = { Text("Xác nhận xóa?", fontWeight = FontWeight.Bold) },
+            text = { Text("Bạn có chắc chắn muốn xóa \"${item.name}\"? Thao tác này không thể hoàn tác.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val ok = storageManager.deleteFileOrFolder(item)
+                        if (ok) {
+                            refreshList()
+                            targetItemForDelete = null
+                            Toast.makeText(context, "Đã xóa", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "Lỗi khi xóa", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                ) {
+                    Text("Xóa", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { targetItemForDelete = null }) {
+                    Text("Hủy")
+                }
+            }
+        )
+    }
+
     // Active Note Viewer & Editor Modal
     activeNoteFile?.let { noteFile ->
         NoteDetailDialog(
@@ -332,9 +515,15 @@ fun NotesListScreen(
 @Composable
 private fun FolderItem(
     folder: File,
-    onClick: () -> Unit
+    isPinned: Boolean,
+    onClick: () -> Unit,
+    onRename: () -> Unit,
+    onDelete: () -> Unit,
+    onTogglePin: () -> Unit
 ) {
+    var showMenu by remember { mutableStateOf(false) }
     val childCount = folder.listFiles()?.size ?: 0
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -371,6 +560,50 @@ private fun FolderItem(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+
+            Box {
+                IconButton(onClick = { showMenu = true }) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Tùy chọn",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(if (isPinned) "Bỏ ghim lối tắt" else "Ghim làm lối tắt") },
+                        onClick = {
+                            showMenu = false
+                            onTogglePin()
+                        },
+                        leadingIcon = {
+                            Icon(
+                                if (isPinned) Icons.Default.BookmarkBorder else Icons.Default.Bookmark,
+                                contentDescription = null
+                            )
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Đổi tên") },
+                        onClick = {
+                            showMenu = false
+                            onRename()
+                        },
+                        leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Xóa thư mục", color = MaterialTheme.colorScheme.error) },
+                        onClick = {
+                            showMenu = false
+                            onDelete()
+                        },
+                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) }
+                    )
+                }
+            }
         }
     }
 }
@@ -379,8 +612,11 @@ private fun FolderItem(
 private fun MarkdownFileItem(
     file: File,
     storageManager: StorageManager,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onRename: () -> Unit,
+    onDelete: () -> Unit
 ) {
+    var showMenu by remember { mutableStateOf(false) }
     val syncInfo = remember(file.lastModified()) { storageManager.getFileSyncInfo(file) }
     val isMarkdown = file.name.endsWith(".md", ignoreCase = true) || file.name.endsWith(".markdown", ignoreCase = true)
 
@@ -421,6 +657,37 @@ private fun MarkdownFileItem(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            Box {
+                IconButton(onClick = { showMenu = true }) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Tùy chọn",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Đổi tên") },
+                        onClick = {
+                            showMenu = false
+                            onRename()
+                        },
+                        leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Xóa file", color = MaterialTheme.colorScheme.error) },
+                        onClick = {
+                            showMenu = false
+                            onDelete()
+                        },
+                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) }
+                    )
+                }
             }
         }
     }
@@ -500,6 +767,20 @@ private fun NoteDetailDialog(
                     if (success) {
                         reload()
                         Toast.makeText(context, "Đã lưu ghi chú", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onDeleteTask = { lineIndex ->
+                    val success = storageManager.deleteTask(file, lineIndex)
+                    if (success) {
+                        reload()
+                        Toast.makeText(context, "Đã xóa task", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onUpdateTaskText = { lineIndex, newText ->
+                    val success = storageManager.updateTaskText(file, lineIndex, newText)
+                    if (success) {
+                        reload()
+                        Toast.makeText(context, "Đã cập nhật task", Toast.LENGTH_SHORT).show()
                     }
                 },
                 onRefresh = {

@@ -1,11 +1,7 @@
 package com.trinhquyetchien.markdowntray.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -28,27 +24,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.FormatBold
-import androidx.compose.material.icons.filled.FormatItalic
-import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
-import androidx.compose.material.icons.filled.FormatQuote
+import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.HourglassEmpty
-import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.PendingActions
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material.icons.filled.Title
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
@@ -62,10 +51,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
@@ -83,17 +72,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.trinhquyetchien.markdowntray.data.MarkdownAnnotator
 import com.trinhquyetchien.markdowntray.data.MarkdownNode
 import com.trinhquyetchien.markdowntray.data.MarkdownParser
 import com.trinhquyetchien.markdowntray.data.SyncStatusInfo
@@ -110,6 +100,8 @@ fun MarkdownViewer(
     onAddTask: (taskText: String) -> Unit,
     onSaveRawContent: (newContent: String) -> Unit,
     onRefresh: () -> Unit,
+    onDeleteTask: ((lineIndex: Int) -> Unit)? = null,
+    onUpdateTaskText: ((lineIndex: Int, newText: String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var newTaskText by remember { mutableStateOf("") }
@@ -309,11 +301,22 @@ fun MarkdownViewer(
                                 task = node,
                                 onCheckedChange = { isChecked ->
                                     onToggleTask(node.lineIndex, isChecked)
-                                }
+                                },
+                                onDelete = onDeleteTask?.let { { it(node.lineIndex) } },
+                                onUpdateText = onUpdateTaskText?.let { { newText -> it(node.lineIndex, newText) } }
                             )
                         }
                         is MarkdownNode.Header -> {
                             HeaderItem(header = node)
+                        }
+                        is MarkdownNode.BulletList -> {
+                            BulletListItem(item = node)
+                        }
+                        is MarkdownNode.NumberedList -> {
+                            NumberedListItem(item = node)
+                        }
+                        is MarkdownNode.BlockQuote -> {
+                            BlockQuoteItem(text = node.text)
                         }
                         is MarkdownNode.NormalText -> {
                             NormalTextItem(item = node)
@@ -329,7 +332,7 @@ fun MarkdownViewer(
             }
         }
 
-        // Modern Docked Quick-Add Task Bar
+        // Docked Quick-Add Task Bar
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.surface,
@@ -392,7 +395,7 @@ fun MarkdownViewer(
         }
     }
 
-    // Modern Markdown Editor Dialog with Syntax Toolbar & Live Preview
+    // Markdown Editor Dialog with Syntax Toolbar & Live Preview
     if (showEditDialog) {
         ModernMarkdownEditorDialog(
             initialContent = rawContent,
@@ -443,17 +446,31 @@ private fun StatBadge(
 @Composable
 private fun TaskCardItem(
     task: MarkdownNode.Task,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    onDelete: (() -> Unit)? = null,
+    onUpdateText: ((String) -> Unit)? = null
 ) {
+    var showEditDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
     val cardBg by animateColorAsState(
         if (task.isChecked) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
         else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
         label = "taskBg"
     )
 
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val codeBgColor = MaterialTheme.colorScheme.surfaceVariant
+
+    val annotatedText = remember(task.text, primaryColor, secondaryColor, codeBgColor) {
+        MarkdownAnnotator.annotate(task.text, primaryColor, secondaryColor, codeBgColor)
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(start = (task.indentLevel * 16).dp)
             .clip(RoundedCornerShape(14.dp))
             .clickable { onCheckedChange(!task.isChecked) },
         shape = RoundedCornerShape(14.dp),
@@ -476,7 +493,7 @@ private fun TaskCardItem(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = task.text,
+                    text = annotatedText,
                     style = MaterialTheme.typography.bodyLarge.copy(
                         textDecoration = if (task.isChecked) TextDecoration.LineThrough else TextDecoration.None
                     ),
@@ -484,38 +501,190 @@ private fun TaskCardItem(
                     else MaterialTheme.colorScheme.onSurface,
                     fontWeight = if (task.isChecked) FontWeight.Normal else FontWeight.Medium
                 )
+            }
 
-                // Highlighting tags or dates in task if any
-                val tags = remember(task.text) { extractTags(task.text) }
-                if (tags.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier.horizontalScroll(rememberScrollState())
-                    ) {
-                        tags.forEach { tag ->
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
-                            ) {
-                                Text(
-                                    text = tag,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                    }
+            if (onUpdateText != null) {
+                IconButton(
+                    onClick = { showEditDialog = true },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Sửa task",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                }
+            }
+
+            if (onDelete != null) {
+                IconButton(
+                    onClick = { showDeleteConfirm = true },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Xóa task",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f)
+                    )
                 }
             }
         }
     }
+
+    // Edit Task Dialog
+    if (showEditDialog && onUpdateText != null) {
+        var editFieldValue by remember { mutableStateOf(task.text) }
+        AlertDialog(
+            onDismissRequest = { showEditDialog = false },
+            title = { Text("Chỉnh sửa nhiệm vụ", fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(
+                    value = editFieldValue,
+                    onValueChange = { editFieldValue = it },
+                    label = { Text("Nội dung task") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (editFieldValue.isNotBlank()) {
+                            onUpdateText(editFieldValue)
+                            showEditDialog = false
+                        }
+                    }
+                ) {
+                    Text("Lưu", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditDialog = false }) {
+                    Text("Hủy")
+                }
+            }
+        )
+    }
+
+    // Delete Task Dialog
+    if (showDeleteConfirm && onDelete != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Xóa nhiệm vụ?", fontWeight = FontWeight.Bold) },
+            text = { Text("\"${task.text}\" sẽ bị xóa khỏi file.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDelete()
+                        showDeleteConfirm = false
+                    }
+                ) {
+                    Text("Xóa", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Hủy")
+                }
+            }
+        )
+    }
 }
 
-private fun extractTags(text: String): List<String> {
-    val regex = Regex("(#[a-zA-Z0-9_\\p{L}]+|@[a-zA-Z0-9_]+|\\d{4}-\\d{2}-\\d{2})")
-    return regex.findAll(text).map { it.value }.toList()
+@Composable
+private fun BulletListItem(item: MarkdownNode.BulletList) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val codeBgColor = MaterialTheme.colorScheme.surfaceVariant
+    val annotated = remember(item.text, primaryColor, secondaryColor, codeBgColor) {
+        MarkdownAnnotator.annotate(item.text, primaryColor, secondaryColor, codeBgColor)
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = (item.indentLevel * 16 + 8).dp, top = 2.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Icon(
+            imageVector = Icons.Default.FiberManualRecord,
+            contentDescription = null,
+            modifier = Modifier
+                .padding(top = 7.dp, end = 8.dp)
+                .size(6.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = annotated,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+private fun NumberedListItem(item: MarkdownNode.NumberedList) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val codeBgColor = MaterialTheme.colorScheme.surfaceVariant
+    val annotated = remember(item.text, primaryColor, secondaryColor, codeBgColor) {
+        MarkdownAnnotator.annotate(item.text, primaryColor, secondaryColor, codeBgColor)
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = (item.indentLevel * 16 + 8).dp, top = 2.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = "${item.number}.",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(end = 8.dp)
+        )
+        Text(
+            text = annotated,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+private fun BlockQuoteItem(text: String) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val codeBgColor = MaterialTheme.colorScheme.surfaceVariant
+    val annotated = remember(text, primaryColor, secondaryColor, codeBgColor) {
+        MarkdownAnnotator.annotate(text, primaryColor, secondaryColor, codeBgColor)
+    }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+    ) {
+        Row(modifier = Modifier.padding(10.dp)) {
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .height(24.dp)
+                    .background(MaterialTheme.colorScheme.primary)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = annotated,
+                style = MaterialTheme.typography.bodyMedium,
+                fontStyle = FontStyle.Italic,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
 }
 
 @Composable
@@ -553,39 +722,19 @@ private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third:
 
 @Composable
 private fun NormalTextItem(item: MarkdownNode.NormalText) {
-    if (item.text.startsWith(">")) {
-        // Blockquote
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-        ) {
-            Row(modifier = Modifier.padding(8.dp)) {
-                Box(
-                    modifier = Modifier
-                        .width(3.dp)
-                        .height(24.dp)
-                        .background(MaterialTheme.colorScheme.primary)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = item.text.removePrefix(">").trim(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontStyle = FontStyle.Italic,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    } else {
-        Text(
-            text = item.text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(vertical = 2.dp)
-        )
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val codeBgColor = MaterialTheme.colorScheme.surfaceVariant
+    val annotated = remember(item.text, primaryColor, secondaryColor, codeBgColor) {
+        MarkdownAnnotator.annotate(item.text, primaryColor, secondaryColor, codeBgColor)
     }
+
+    Text(
+        text = annotated,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(vertical = 2.dp)
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -595,8 +744,20 @@ fun ModernMarkdownEditorDialog(
     onDismiss: () -> Unit,
     onSave: (String) -> Unit
 ) {
-    var content by remember { mutableStateOf(initialContent) }
+    var textFieldValue by remember {
+        mutableStateOf(TextFieldValue(initialContent, TextRange(initialContent.length)))
+    }
     var selectedTab by remember { mutableIntStateOf(0) } // 0 = Edit, 1 = Preview
+
+    fun insertSyntax(prefix: String, suffix: String = "") {
+        val sel = textFieldValue.selection
+        val text = textFieldValue.text
+        val selectedText = text.substring(sel.start, sel.end)
+        val replacement = "$prefix$selectedText$suffix"
+        val newText = text.replaceRange(sel.start, sel.end, replacement)
+        val newCursorPos = if (selectedText.isEmpty()) sel.start + prefix.length else sel.start + replacement.length
+        textFieldValue = TextFieldValue(newText, TextRange(newCursorPos))
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -618,7 +779,7 @@ fun ModernMarkdownEditorDialog(
                         }
                     },
                     actions = {
-                        TextButton(onClick = { onSave(content) }) {
+                        TextButton(onClick = { onSave(textFieldValue.text) }) {
                             Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Lưu", fontWeight = FontWeight.Bold)
@@ -631,7 +792,6 @@ fun ModernMarkdownEditorDialog(
             },
             bottomBar = {
                 if (selectedTab == 0) {
-                    // Quick Syntax Toolbar above keyboard
                     Surface(
                         tonalElevation = 4.dp,
                         modifier = Modifier.fillMaxWidth()
@@ -640,21 +800,23 @@ fun ModernMarkdownEditorDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .horizontalScroll(rememberScrollState())
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            EditorToolButton(text = "[ ] Task") { content += "\n- [ ] " }
-                            EditorToolButton(text = "# H1") { content += "\n# " }
-                            EditorToolButton(text = "## H2") { content += "\n## " }
-                            EditorToolButton(text = "**B**") { content += "****" }
-                            EditorToolButton(text = "*I*") { content += "**" }
-                            EditorToolButton(text = "- List") { content += "\n- " }
-                            EditorToolButton(text = "> Quote") { content += "\n> " }
+                            EditorToolButton(text = "[ ] Task") { insertSyntax("\n- [ ] ") }
+                            EditorToolButton(text = "# H1") { insertSyntax("\n# ") }
+                            EditorToolButton(text = "## H2") { insertSyntax("\n## ") }
+                            EditorToolButton(text = "**B**") { insertSyntax("**", "**") }
+                            EditorToolButton(text = "*I*") { insertSyntax("*", "*") }
+                            EditorToolButton(text = "`Code`") { insertSyntax("`", "`") }
+                            EditorToolButton(text = "- List") { insertSyntax("\n- ") }
+                            EditorToolButton(text = "1. List") { insertSyntax("\n1. ") }
+                            EditorToolButton(text = "> Quote") { insertSyntax("\n> ") }
                             EditorToolButton(text = "📅 Ngày") {
                                 val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-                                content += " $today "
+                                insertSyntax(" $today ")
                             }
-                            EditorToolButton(text = "---") { content += "\n---\n" }
+                            EditorToolButton(text = "---") { insertSyntax("\n---\n") }
                         }
                     }
                 }
@@ -665,7 +827,7 @@ fun ModernMarkdownEditorDialog(
                     .fillMaxSize()
                     .padding(padding)
             ) {
-                TabRow(selectedTabIndex = selectedTab) {
+                PrimaryTabRow(selectedTabIndex = selectedTab) {
                     Tab(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
@@ -692,8 +854,8 @@ fun ModernMarkdownEditorDialog(
 
                 if (selectedTab == 0) {
                     OutlinedTextField(
-                        value = content,
-                        onValueChange = { content = it },
+                        value = textFieldValue,
+                        onValueChange = { textFieldValue = it },
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(16.dp),
@@ -704,8 +866,7 @@ fun ModernMarkdownEditorDialog(
                         )
                     )
                 } else {
-                    // Live Markdown Preview
-                    val previewNodes = remember(content) { MarkdownParser.parse(content) }
+                    val previewNodes = remember(textFieldValue.text) { MarkdownParser.parse(textFieldValue.text) }
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
@@ -727,7 +888,12 @@ fun ModernMarkdownEditorDialog(
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = node.text,
+                                            text = MarkdownAnnotator.annotate(
+                                                node.text,
+                                                MaterialTheme.colorScheme.primary,
+                                                MaterialTheme.colorScheme.secondary,
+                                                MaterialTheme.colorScheme.surfaceVariant
+                                            ),
                                             style = MaterialTheme.typography.bodyMedium.copy(
                                                 textDecoration = if (node.isChecked) TextDecoration.LineThrough else TextDecoration.None
                                             ),
@@ -737,6 +903,9 @@ fun ModernMarkdownEditorDialog(
                                     }
                                 }
                                 is MarkdownNode.Header -> HeaderItem(header = node)
+                                is MarkdownNode.BulletList -> BulletListItem(item = node)
+                                is MarkdownNode.NumberedList -> NumberedListItem(item = node)
+                                is MarkdownNode.BlockQuote -> BlockQuoteItem(text = node.text)
                                 is MarkdownNode.NormalText -> NormalTextItem(item = node)
                                 is MarkdownNode.Divider -> HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
                             }
