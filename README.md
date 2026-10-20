@@ -1,5 +1,7 @@
 # MarkdownTray Android
 
+[![Android CI](https://github.com/trinhquyetchien/MarkdownTrayAndroid/actions/workflows/ci.yml/badge.svg)](https://github.com/trinhquyetchien/MarkdownTrayAndroid/actions/workflows/ci.yml)
+
 Companion Android app for [MarkdownTray](https://github.com/trinhquyetchien/MarkdownTrayLinux), designed for seamless mobile note-taking, task tracking, and schedule management directly from your Markdown and JSON files synced via Syncthing or local storage.
 
 ---

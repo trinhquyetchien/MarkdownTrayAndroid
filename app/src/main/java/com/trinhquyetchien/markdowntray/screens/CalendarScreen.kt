@@ -131,7 +131,7 @@ class CalendarWebBridge(
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@SuppressLint("SetJavaScriptEnabled")
+@SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
 @Composable
 fun CalendarScreen(
     storageManager: StorageManager,
@@ -182,7 +182,7 @@ fun CalendarScreen(
         }
     }
 
-    val bridge = remember {
+    val bridge: CalendarWebBridge = remember {
         CalendarWebBridge(context, storageManager) {
             syncInfo = storageManager.getFileSyncInfo(storageManager.getCalendarFile())
             com.trinhquyetchien.markdowntray.alarm.CalendarAlarmScheduler.scheduleUpcomingAlarms(context, storageManager)
