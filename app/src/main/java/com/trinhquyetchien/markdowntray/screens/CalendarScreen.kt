@@ -5,15 +5,19 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -34,6 +38,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Repeat
+import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -53,8 +58,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,11 +71,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -85,6 +97,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -176,7 +189,7 @@ fun CalendarScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Header Controls: View mode switcher (Day, Week, Month)
+            // Header Controls: 4 View Modes (Danh sách ngày, Kéo thả Timeline, Tuần, Tháng)
             Surface(
                 color = MaterialTheme.colorScheme.surface,
                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -185,7 +198,7 @@ fun CalendarScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -193,22 +206,26 @@ fun CalendarScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(
                             onClick = { viewModel.navigatePrevious() },
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(34.dp)
                         ) {
                             Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Trước", modifier = Modifier.size(18.dp))
                         }
 
-                        TextButton(onClick = { viewModel.navigateToday() }) {
+                        TextButton(
+                            onClick = { viewModel.navigateToday() },
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
+                        ) {
                             Text(
-                                text = if (uiState.selectedYMD == uiState.todayYMD) "Hôm nay" else "Về hôm nay",
+                                text = if (uiState.selectedYMD == uiState.todayYMD) "Hôm nay" else "Hôm nay",
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 13.sp
                             )
                         }
 
                         IconButton(
                             onClick = { viewModel.navigateNext() },
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(34.dp)
                         ) {
                             Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = "Sau", modifier = Modifier.size(18.dp))
                         }
@@ -217,14 +234,19 @@ fun CalendarScreen(
                     // Mode switch tabs
                     Row(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
+                            .clip(RoundedCornerShape(14.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant)
                             .padding(2.dp)
                     ) {
                         ViewModeButton(
-                            label = "Ngày",
+                            label = "DS",
                             selected = uiState.viewMode == CalendarViewMode.DAY,
                             onClick = { viewModel.setViewMode(CalendarViewMode.DAY) }
+                        )
+                        ViewModeButton(
+                            label = "Giờ",
+                            selected = uiState.viewMode == CalendarViewMode.TIMELINE,
+                            onClick = { viewModel.setViewMode(CalendarViewMode.TIMELINE) }
                         )
                         ViewModeButton(
                             label = "Tuần",
@@ -242,7 +264,7 @@ fun CalendarScreen(
 
             // Current date title banner
             val headerTitle = when (uiState.viewMode) {
-                CalendarViewMode.DAY -> SimpleDateFormat("EEEE, dd MMMM yyyy", Locale.forLanguageTag("vi-VN")).format(uiState.selectedCalendar.time)
+                CalendarViewMode.DAY, CalendarViewMode.TIMELINE -> SimpleDateFormat("EEEE, dd MMMM yyyy", Locale.forLanguageTag("vi-VN")).format(uiState.selectedCalendar.time)
                 CalendarViewMode.WEEK -> "Tuần ${uiState.selectedCalendar.get(Calendar.WEEK_OF_YEAR)} - Tháng ${uiState.selectedCalendar.get(Calendar.MONTH) + 1}/${uiState.selectedCalendar.get(Calendar.YEAR)}"
                 CalendarViewMode.MONTH -> SimpleDateFormat("MMMM yyyy", Locale.forLanguageTag("vi-VN")).format(uiState.selectedCalendar.time)
             }
@@ -251,7 +273,7 @@ fun CalendarScreen(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
             )
 
             // Content body according to view mode
@@ -261,6 +283,26 @@ fun CalendarScreen(
                         selectedDateYMD = uiState.selectedYMD,
                         occurrences = dayOccurrences,
                         onOccurrenceClick = { occ -> viewModel.setEditingOccurrence(occ) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                CalendarViewMode.TIMELINE -> {
+                    // Kéo thả và hiển thị trực quan 24 giờ như trên Web
+                    DraggableTimelineView(
+                        selectedDateYMD = uiState.selectedYMD,
+                        occurrences = dayOccurrences,
+                        onOccurrenceClick = { occ -> viewModel.setEditingOccurrence(occ) },
+                        onOccurrenceTimeChanged = { occ, newStartH, newStartM, newEndH, newEndM ->
+                            val sStr = String.format(Locale.US, "%sT%02d:%02d:00", occ.occurrenceDate, newStartH, newStartM)
+                            val eStr = String.format(Locale.US, "%sT%02d:%02d:00", occ.occurrenceDate, newEndH, newEndM)
+                            val updated = occ.event.copy(start = sStr, end = eStr)
+                            if (occ.isRecurring) {
+                                viewModel.updateRecurringEvent(occ.event, updated, occ.occurrenceDate, applyToAll = true)
+                            } else {
+                                viewModel.updateEvent(updated)
+                            }
+                            Toast.makeText(context, "Đã cập nhật giờ sự kiện", Toast.LENGTH_SHORT).show()
+                        },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -281,7 +323,7 @@ fun CalendarScreen(
                         allEvents = uiState.events,
                         onSelectDate = { ymd, cal ->
                             viewModel.selectDate(ymd, cal)
-                            viewModel.setViewMode(CalendarViewMode.DAY)
+                            viewModel.setViewMode(CalendarViewMode.TIMELINE)
                         },
                         modifier = Modifier.weight(1f)
                     )
@@ -405,17 +447,178 @@ private fun ViewModeButton(
     onClick: () -> Unit
 ) {
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(10.dp),
         color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
         modifier = Modifier.clickable { onClick() }
     ) {
         Text(
             text = label,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
-            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            style = MaterialTheme.typography.labelSmall,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
             color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+// -------------------------------------------------------------
+// Interactive 24H Draggable Timeline View (Tương tự Calendar Web)
+// -------------------------------------------------------------
+@Composable
+private fun DraggableTimelineView(
+    selectedDateYMD: String,
+    occurrences: List<CalendarOccurrence>,
+    onOccurrenceClick: (CalendarOccurrence) -> Unit,
+    onOccurrenceTimeChanged: (CalendarOccurrence, startH: Int, startM: Int, endH: Int, endM: Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val hourHeightDp = 60.dp
+    val density = LocalDensity.current
+    val hourHeightPx = with(density) { hourHeightDp.toPx() }
+
+    val scrollState = rememberScrollState()
+
+    // Tự động scroll đến 8h sáng lúc ban đầu
+    LaunchedEffect(Unit) {
+        scrollState.scrollTo((8 * hourHeightPx).toInt())
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+    ) {
+        // Grid 24 giờ
+        Column(modifier = Modifier.fillMaxWidth()) {
+            for (hour in 0..23) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(hourHeightDp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Text(
+                        text = String.format(Locale.US, "%02d:00", hour),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .width(52.dp)
+                            .padding(start = 8.dp, top = 2.dp)
+                    )
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+
+        // Overlay các sự kiện có thể kéo thả thay đổi giờ
+        occurrences.forEach { occ ->
+            DraggableEventBlock(
+                occurrence = occ,
+                hourHeightPx = hourHeightPx,
+                onClick = { onOccurrenceClick(occ) },
+                onDragCommit = { startH, startM, endH, endM ->
+                    onOccurrenceTimeChanged(occ, startH, startM, endH, endM)
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun DraggableEventBlock(
+    occurrence: CalendarOccurrence,
+    hourHeightPx: Float,
+    onClick: () -> Unit,
+    onDragCommit: (startH: Int, startM: Int, endH: Int, endM: Int) -> Unit
+) {
+    val durationMin = occurrence.durationMinutes
+    val durationHours = durationMin / 60f
+    val baseTopPx = (occurrence.startHour + occurrence.startMinute / 60f) * hourHeightPx
+    val heightPx = (durationHours * hourHeightPx).coerceAtLeast(36f)
+
+    var dragOffsetY by remember(baseTopPx) { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
+
+    val evColor = try {
+        Color(android.graphics.Color.parseColor(occurrence.event.color))
+    } catch (e: Exception) {
+        MaterialTheme.colorScheme.primary
+    }
+
+    val topPx = baseTopPx + dragOffsetY
+    val topDp = with(density) { topPx.toDp() }
+    val heightDp = with(density) { heightPx.toDp() }
+
+    Surface(
+        modifier = Modifier
+            .padding(start = 60.dp, end = 16.dp)
+            .offset(y = topDp)
+            .fillMaxWidth()
+            .height(heightDp)
+            .clip(RoundedCornerShape(8.dp))
+            .pointerInput(occurrence.event.id) {
+                detectDragGestures(
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        dragOffsetY += dragAmount.y
+                    },
+                    onDragEnd = {
+                        val newY = (baseTopPx + dragOffsetY).coerceIn(0f, 23.5f * hourHeightPx)
+                        val totalMinutes = (newY / hourHeightPx * 60f).roundToInt()
+                        // Làm tròn về mỗi 15 phút
+                        val snappedMin = (totalMinutes / 15) * 15
+                        val newStartH = snappedMin / 60
+                        val newStartM = snappedMin % 60
+
+                        val endTotalMin = (snappedMin + durationMin).coerceAtMost(24 * 60 - 1)
+                        val newEndH = endTotalMin / 60
+                        val newEndM = endTotalMin % 60
+
+                        dragOffsetY = 0f
+                        onDragCommit(newStartH, newStartM, newEndH, newEndM)
+                    },
+                    onDragCancel = {
+                        dragOffsetY = 0f
+                    }
+                )
+            }
+            .clickable { onClick() },
+        color = evColor.copy(alpha = 0.88f),
+        shape = RoundedCornerShape(8.dp),
+        shadowElevation = 2.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = occurrence.event.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = String.format(Locale.US, "%02d:%02d - %02d:%02d", occurrence.startHour, occurrence.startMinute, occurrence.endHour, occurrence.endMinute),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.9f)
+                )
+            }
+
+            Icon(
+                imageVector = Icons.Outlined.TouchApp,
+                contentDescription = "Kéo để đổi giờ",
+                tint = Color.White.copy(alpha = 0.6f),
+                modifier = Modifier.size(14.dp)
+            )
+        }
     }
 }
 

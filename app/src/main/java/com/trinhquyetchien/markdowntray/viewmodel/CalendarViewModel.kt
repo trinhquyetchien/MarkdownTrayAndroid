@@ -87,7 +87,7 @@ class CalendarViewModel(
     fun navigatePrevious() {
         val cal = _uiState.value.selectedCalendar.clone() as Calendar
         when (_uiState.value.viewMode) {
-            CalendarViewMode.DAY -> cal.add(Calendar.DAY_OF_YEAR, -1)
+            CalendarViewMode.DAY, CalendarViewMode.TIMELINE -> cal.add(Calendar.DAY_OF_YEAR, -1)
             CalendarViewMode.WEEK -> cal.add(Calendar.WEEK_OF_YEAR, -1)
             CalendarViewMode.MONTH -> cal.add(Calendar.MONTH, -1)
         }
@@ -100,7 +100,7 @@ class CalendarViewModel(
     fun navigateNext() {
         val cal = _uiState.value.selectedCalendar.clone() as Calendar
         when (_uiState.value.viewMode) {
-            CalendarViewMode.DAY -> cal.add(Calendar.DAY_OF_YEAR, 1)
+            CalendarViewMode.DAY, CalendarViewMode.TIMELINE -> cal.add(Calendar.DAY_OF_YEAR, 1)
             CalendarViewMode.WEEK -> cal.add(Calendar.WEEK_OF_YEAR, 1)
             CalendarViewMode.MONTH -> cal.add(Calendar.MONTH, 1)
         }

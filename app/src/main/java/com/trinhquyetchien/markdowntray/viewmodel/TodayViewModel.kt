@@ -1,8 +1,9 @@
 package com.trinhquyetchien.markdowntray.viewmodel
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import com.trinhquyetchien.markdowntray.data.DirectoryObserver
+import com.trinhquyetchien.markdowntray.data.OverdueTask
+import com.trinhquyetchien.markdowntray.data.OverdueTaskManager
 import com.trinhquyetchien.markdowntray.data.StorageManager
 import com.trinhquyetchien.markdowntray.data.SyncStatusInfo
 import java.io.File
@@ -13,7 +14,6 @@ import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 
 data class TodayUiState(
     val selectedCalendar: Calendar = Calendar.getInstance(),
@@ -21,7 +21,8 @@ data class TodayUiState(
     val todayDateStr: String = "",
     val rawContent: String = "",
     val syncInfo: SyncStatusInfo? = null,
-    val dailyAlias: String = "Daily List"
+    val overdueTasks: List<OverdueTask> = emptyList(),
+    val isOverdueExpanded: Boolean = true
 )
 
 class TodayViewModel(
@@ -33,8 +34,7 @@ class TodayViewModel(
     private val _uiState = MutableStateFlow(
         TodayUiState(
             selectedDateStr = dateFormat.format(Date()),
-            todayDateStr = dateFormat.format(Date()),
-            dailyAlias = storageManager.dailyAlias
+            todayDateStr = dateFormat.format(Date())
         )
     )
     val uiState: StateFlow<TodayUiState> = _uiState.asStateFlow()
@@ -49,11 +49,8 @@ class TodayViewModel(
     private fun setupDirectoryObserver() {
         directoryObserver?.stop()
         val dir = File(storageManager.dailyNotesDir)
-        directoryObserver = storageManager.createDirectoryObserver(dir) { changedPath ->
-            val curDate = _uiState.value.selectedDateStr
-            if (changedPath == null || changedPath == "$curDate.md") {
-                loadContent()
-            }
+        directoryObserver = storageManager.createDirectoryObserver(dir) {
+            loadContent()
         }
         directoryObserver?.start()
     }
@@ -68,10 +65,23 @@ class TodayViewModel(
         val content = if (targetFile.exists()) storageManager.readText(targetFile) else ""
         val sync = storageManager.getFileSyncInfo(targetFile)
 
+        // Load overdue tasks từ các ngày trước
+        val overdues = if (state.selectedDateStr == state.todayDateStr) {
+            OverdueTaskManager.getOverdueTasks(File(storageManager.dailyNotesDir), state.todayDateStr)
+        } else {
+            emptyList()
+        }
+
         _uiState.value = state.copy(
             rawContent = content,
             syncInfo = sync,
-            dailyAlias = storageManager.dailyAlias
+            overdueTasks = overdues
+        )
+    }
+
+    fun toggleOverdueExpanded() {
+        _uiState.value = _uiState.value.copy(
+            isOverdueExpanded = !_uiState.value.isOverdueExpanded
         )
     }
 
@@ -101,6 +111,19 @@ class TodayViewModel(
     fun toggleTask(lineIndex: Int, isChecked: Boolean): Boolean {
         val file = File(storageManager.dailyNotesDir, "${_uiState.value.selectedDateStr}.md")
         val success = storageManager.toggleTask(file, lineIndex, isChecked)
+        if (success) loadContent()
+        return success
+    }
+
+    fun toggleOverdueTask(task: OverdueTask, isChecked: Boolean): Boolean {
+        val success = storageManager.toggleTask(task.file, task.lineIndex, isChecked)
+        if (success) loadContent()
+        return success
+    }
+
+    fun moveOverdueTaskToToday(task: OverdueTask): Boolean {
+        val todayFile = storageManager.getTodayFile()
+        val success = OverdueTaskManager.moveTaskToToday(storageManager, task, todayFile)
         if (success) loadContent()
         return success
     }

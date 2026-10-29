@@ -1,6 +1,10 @@
 package com.trinhquyetchien.markdowntray.screens
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,19 +19,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.InsertDriveFile
 import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.Warning
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -36,7 +35,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -52,6 +50,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.trinhquyetchien.markdowntray.data.FilePathUtils
 import com.trinhquyetchien.markdowntray.data.StorageManager
 import com.trinhquyetchien.markdowntray.viewmodel.AppViewModelFactory
 import com.trinhquyetchien.markdowntray.viewmodel.SettingsViewModel
@@ -68,22 +67,70 @@ fun SettingsScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
 
-    var dailyDir by remember { mutableStateOf(uiState.dailyDir) }
-    var dailyAlias by remember { mutableStateOf(uiState.dailyAlias) }
     var notesRootDir by remember { mutableStateOf(uiState.notesRootDir) }
+    var dailyDir by remember { mutableStateOf(uiState.dailyDir) }
     var deadlineFile by remember { mutableStateOf(uiState.deadlineFile) }
-    var deadlineAlias by remember { mutableStateOf(uiState.deadlineAlias) }
     var calendarFile by remember { mutableStateOf(uiState.calendarFile) }
 
-    var showAddMenuDialog by remember { mutableStateOf(false) }
-
     LaunchedEffect(uiState) {
-        dailyDir = uiState.dailyDir
-        dailyAlias = uiState.dailyAlias
         notesRootDir = uiState.notesRootDir
+        dailyDir = uiState.dailyDir
         deadlineFile = uiState.deadlineFile
-        deadlineAlias = uiState.deadlineAlias
         calendarFile = uiState.calendarFile
+    }
+
+    // Launchers chọn thư mục
+    val notesRootFolderLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val path = FilePathUtils.getAbsolutePathFromUri(context, uri)
+            if (path != null) {
+                notesRootDir = path
+                viewModel.setNotesRootDir(path)
+                Toast.makeText(context, "Đã chọn thư mục Note", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val dailyFolderLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val path = FilePathUtils.getAbsolutePathFromUri(context, uri)
+            if (path != null) {
+                dailyDir = path
+                viewModel.setDailyDir(path)
+                Toast.makeText(context, "Đã chọn thư mục Daily", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // Launchers chọn tệp (Deadline.md & calendar.json)
+    val deadlineFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val path = FilePathUtils.getAbsolutePathFromUri(context, uri)
+            if (path != null) {
+                deadlineFile = path
+                viewModel.setDeadlineFile(path)
+                Toast.makeText(context, "Đã chọn tệp Deadline", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val calendarFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val path = FilePathUtils.getAbsolutePathFromUri(context, uri)
+            if (path != null) {
+                calendarFile = path
+                viewModel.setCalendarFile(path)
+                Toast.makeText(context, "Đã chọn tệp Calendar", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     val scrollState = rememberScrollState()
@@ -159,14 +206,14 @@ fun SettingsScreen(
                 }
             }
 
-            // Path Configuration Card
+            // Path Configuration Card with Folder & File Pickers
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Outlined.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.width(8.dp))
@@ -178,57 +225,65 @@ fun SettingsScreen(
                     }
 
                     Text(
-                        text = "Đảm bảo đường dẫn trùng khớp với cấu hình MarkdownTray trên máy tính của bạn.",
+                        text = "Chọn thư mục hoặc tệp trực tiếp bằng nút duyệt bên cạnh hoặc chỉnh sửa đường dẫn.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
+                    // 1. Thư mục Note chính
+                    OutlinedTextField(
+                        value = notesRootDir,
+                        onValueChange = { notesRootDir = it },
+                        label = { Text("Thư mục Note chính (Notes Root)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        trailingIcon = {
+                            IconButton(onClick = { notesRootFolderLauncher.launch(null) }) {
+                                Icon(Icons.Outlined.FolderOpen, contentDescription = "Chọn thư mục Note", tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    )
+
+                    // 2. Thư mục Daily Notes
                     OutlinedTextField(
                         value = dailyDir,
                         onValueChange = { dailyDir = it },
                         label = { Text("Thư mục Daily Notes") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        singleLine = true,
+                        trailingIcon = {
+                            IconButton(onClick = { dailyFolderLauncher.launch(null) }) {
+                                Icon(Icons.Outlined.FolderOpen, contentDescription = "Chọn thư mục Daily", tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
                     )
 
-                    OutlinedTextField(
-                        value = dailyAlias,
-                        onValueChange = { dailyAlias = it },
-                        label = { Text("Tên hiển thị tab Daily") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-
-                    OutlinedTextField(
-                        value = notesRootDir,
-                        onValueChange = { notesRootDir = it },
-                        label = { Text("Thư mục gốc ghi chú (Notes Root)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-
+                    // 3. Tệp Deadline
                     OutlinedTextField(
                         value = deadlineFile,
                         onValueChange = { deadlineFile = it },
-                        label = { Text("Đường dẫn tệp Deadline") },
+                        label = { Text("Đường dẫn tệp Deadline (Deadline.md)") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        singleLine = true,
+                        trailingIcon = {
+                            IconButton(onClick = { deadlineFileLauncher.launch(arrayOf("*/*")) }) {
+                                Icon(Icons.Outlined.InsertDriveFile, contentDescription = "Chọn tệp Deadline", tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
                     )
 
-                    OutlinedTextField(
-                        value = deadlineAlias,
-                        onValueChange = { deadlineAlias = it },
-                        label = { Text("Tên hiển thị tab Deadline") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-
+                    // 4. Tệp Calendar
                     OutlinedTextField(
                         value = calendarFile,
                         onValueChange = { calendarFile = it },
                         label = { Text("Đường dẫn tệp Calendar (calendar.json)") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        singleLine = true,
+                        trailingIcon = {
+                            IconButton(onClick = { calendarFileLauncher.launch(arrayOf("*/*")) }) {
+                                Icon(Icons.Outlined.InsertDriveFile, contentDescription = "Chọn tệp Calendar", tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
                     )
 
                     Row(
@@ -251,11 +306,9 @@ fun SettingsScreen(
                         Button(
                             onClick = {
                                 viewModel.savePaths(
-                                    dailyDir = dailyDir,
-                                    dailyAlias = dailyAlias,
                                     notesRootDir = notesRootDir,
+                                    dailyDir = dailyDir,
                                     deadlineFile = deadlineFile,
-                                    deadlineAlias = deadlineAlias,
                                     calendarFile = calendarFile
                                 )
                                 Toast.makeText(context, "Đã lưu cài đặt", Toast.LENGTH_SHORT).show()
@@ -268,130 +321,6 @@ fun SettingsScreen(
                     }
                 }
             }
-
-            // Custom Menus Management Card
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.Bookmark, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Lối tắt Custom Menus",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-
-                        IconButton(onClick = { showAddMenuDialog = true }) {
-                            Icon(Icons.Outlined.Add, contentDescription = "Thêm Menu", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-
-                    Text(
-                        text = "Các thư mục được ghim nhanh trên thanh công cụ duyệt ghi chú.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    if (uiState.customMenus.isEmpty()) {
-                        Text(
-                            text = "Chưa có menu nào được ghim. Bạn có thể ghim nhanh trong tab 'List' hoặc thêm tại đây.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                        )
-                    } else {
-                        uiState.customMenus.forEach { menu ->
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.surface,
-                                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(menu.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                                        Text(menu.path, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-
-                                    IconButton(
-                                        onClick = {
-                                            viewModel.removeCustomMenu(menu.path)
-                                            Toast.makeText(context, "Đã xóa ${menu.name}", Toast.LENGTH_SHORT).show()
-                                        }
-                                    ) {
-                                        Icon(Icons.Outlined.Close, contentDescription = "Xóa menu", tint = MaterialTheme.colorScheme.error)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
         }
-    }
-
-    // Dialog Add Menu Shortcut
-    if (showAddMenuDialog) {
-        var menuName by remember { mutableStateOf("") }
-        var menuPath by remember { mutableStateOf(uiState.notesRootDir) }
-
-        AlertDialog(
-            onDismissRequest = { showAddMenuDialog = false },
-            title = { Text("Thêm Custom Menu", fontWeight = FontWeight.SemiBold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = menuName,
-                        onValueChange = { menuName = it },
-                        label = { Text("Tên hiển thị menu") },
-                        placeholder = { Text("Ví dụ: Dự án A") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = menuPath,
-                        onValueChange = { menuPath = it },
-                        label = { Text("Đường dẫn thư mục") },
-                        placeholder = { Text("/storage/emulated/0/Note/DuAnA") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (menuName.isNotBlank() && menuPath.isNotBlank()) {
-                            viewModel.addCustomMenu(menuName.trim(), menuPath.trim())
-                            Toast.makeText(context, "Đã thêm lối tắt", Toast.LENGTH_SHORT).show()
-                            showAddMenuDialog = false
-                        }
-                    }
-                ) {
-                    Text("Thêm", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAddMenuDialog = false }) {
-                    Text("Hủy")
-                }
-            }
-        )
     }
 }

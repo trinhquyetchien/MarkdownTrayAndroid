@@ -1,7 +1,6 @@
 package com.trinhquyetchien.markdowntray.viewmodel
 
 import androidx.lifecycle.ViewModel
-import com.trinhquyetchien.markdowntray.data.CustomMenuEntry
 import com.trinhquyetchien.markdowntray.data.DirectoryObserver
 import com.trinhquyetchien.markdowntray.data.StorageManager
 import com.trinhquyetchien.markdowntray.data.SyncStatusInfo
@@ -14,8 +13,8 @@ import kotlinx.coroutines.flow.asStateFlow
 data class NotesListUiState(
     val rootFolder: File,
     val currentFolder: File,
+    val subfolders: List<File> = emptyList(), // Các thư mục con trực tiếp trong Note
     val filesAndDirs: List<File> = emptyList(),
-    val customMenus: List<CustomMenuEntry> = emptyList(),
     val searchQuery: String = "",
     val activeNoteFile: File? = null,
     val activeNoteContent: String = "",
@@ -40,8 +39,7 @@ class NotesListViewModel(
         _uiState = MutableStateFlow(
             NotesListUiState(
                 rootFolder = root,
-                currentFolder = root,
-                customMenus = storageManager.getCustomMenus()
+                currentFolder = root
             )
         )
         uiState = _uiState.asStateFlow()
@@ -64,10 +62,17 @@ class NotesListViewModel(
 
     fun refreshList() {
         val state = _uiState.value
+        val root = storageManager.getNotesRootFolder()
+        if (!root.exists()) {
+            root.mkdirs()
+        }
         val folder = state.currentFolder
         if (!folder.exists()) {
             folder.mkdirs()
         }
+
+        // Lấy tất cả thư mục có trong thư mục chính (Note)
+        val noteDirs = root.listFiles { file -> file.isDirectory }?.sortedBy { it.name.lowercase(Locale.getDefault()) } ?: emptyList()
 
         val allItems = folder.listFiles()?.toList() ?: emptyList()
         val sorted = allItems.sortedWith(
@@ -83,8 +88,9 @@ class NotesListViewModel(
         }
 
         _uiState.value = state.copy(
-            filesAndDirs = filtered,
-            customMenus = storageManager.getCustomMenus()
+            rootFolder = root,
+            subfolders = noteDirs,
+            filesAndDirs = filtered
         )
     }
 
@@ -214,17 +220,6 @@ class NotesListViewModel(
             return true
         }
         return false
-    }
-
-    fun toggleCustomMenu(folder: File): Boolean {
-        val isPinned = _uiState.value.customMenus.any { it.path == folder.absolutePath }
-        if (isPinned) {
-            storageManager.removeCustomMenu(folder.absolutePath)
-        } else {
-            storageManager.addCustomMenu(folder.name, folder.absolutePath)
-        }
-        _uiState.value = _uiState.value.copy(customMenus = storageManager.getCustomMenus())
-        return !isPinned
     }
 
     fun setShowNewFileDialog(show: Boolean) {

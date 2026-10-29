@@ -23,14 +23,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Bookmark
-import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CreateNewFolder
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.DriveFileRenameOutline
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.FolderSpecial
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Search
@@ -69,7 +68,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.trinhquyetchien.markdowntray.data.CustomMenuEntry
 import com.trinhquyetchien.markdowntray.data.StorageManager
 import com.trinhquyetchien.markdowntray.viewmodel.AppViewModelFactory
 import com.trinhquyetchien.markdowntray.viewmodel.NotesListViewModel
@@ -99,7 +97,7 @@ fun NotesListScreen(
                 title = {
                     Column {
                         Text(
-                            text = if (uiState.currentFolder.absolutePath == uiState.rootFolder.absolutePath) "Ghi chú & Thư mục"
+                            text = if (uiState.currentFolder.absolutePath == uiState.rootFolder.absolutePath) "Thư mục Note chính"
                             else uiState.currentFolder.name,
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.titleLarge
@@ -192,8 +190,8 @@ fun NotesListScreen(
                 )
             )
 
-            // Custom Pinned Shortcuts (Custom Menus row)
-            if (uiState.customMenus.isNotEmpty()) {
+            // Thanh duyệt nhanh các thư mục có trong thư mục chính (Note)
+            if (uiState.subfolders.isNotEmpty()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -201,21 +199,37 @@ fun NotesListScreen(
                         .padding(horizontal = 16.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    uiState.customMenus.forEach { menu ->
-                        val targetDir = File(menu.path)
-                        val isCurrent = uiState.currentFolder.absolutePath == targetDir.absolutePath
+                    // Chip thư mục gốc
+                    val isRoot = uiState.currentFolder.absolutePath == uiState.rootFolder.absolutePath
+                    AssistChip(
+                        onClick = { viewModel.navigateToFolder(uiState.rootFolder) },
+                        label = { Text("Tất cả", fontWeight = if (isRoot) FontWeight.Bold else FontWeight.Normal) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Outlined.FolderSpecial,
+                                contentDescription = null,
+                                tint = if (isRoot) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        },
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = if (isRoot) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        border = AssistChipDefaults.assistChipBorder(
+                            enabled = true,
+                            borderColor = if (isRoot) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                        )
+                    )
+
+                    // Các thư mục con có trong thư mục chính Note (Daily, Deadline, Projects,...)
+                    uiState.subfolders.forEach { dir ->
+                        val isCurrent = uiState.currentFolder.absolutePath == dir.absolutePath
                         AssistChip(
-                            onClick = {
-                                if (targetDir.exists()) {
-                                    viewModel.navigateToFolder(targetDir)
-                                } else {
-                                    Toast.makeText(context, "Thư mục không tồn tại: ${menu.name}", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            label = { Text(menu.name, fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal) },
+                            onClick = { viewModel.navigateToFolder(dir) },
+                            label = { Text(dir.name, fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal) },
                             leadingIcon = {
                                 Icon(
-                                    imageVector = Icons.Outlined.Bookmark,
+                                    imageVector = Icons.Outlined.Folder,
                                     contentDescription = null,
                                     tint = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(16.dp)
@@ -267,11 +281,9 @@ fun NotesListScreen(
                     }
                 } else {
                     items(uiState.filesAndDirs, key = { it.absolutePath }) { file ->
-                        val isPinned = uiState.customMenus.any { it.path == file.absolutePath }
                         FileOrFolderItem(
                             file = file,
                             storageManager = storageManager,
-                            isPinned = isPinned,
                             onClick = {
                                 if (file.isDirectory) {
                                     viewModel.navigateToFolder(file)
@@ -280,14 +292,7 @@ fun NotesListScreen(
                                 }
                             },
                             onRename = { viewModel.setTargetItemForRename(file) },
-                            onDelete = { viewModel.setTargetItemForDelete(file) },
-                            onTogglePin = if (file.isDirectory) {
-                                {
-                                    val pinnedNow = viewModel.toggleCustomMenu(file)
-                                    val msg = if (pinnedNow) "Đã ghim menu: ${file.name}" else "Đã bỏ ghim menu: ${file.name}"
-                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                }
-                            } else null
+                            onDelete = { viewModel.setTargetItemForDelete(file) }
                         )
                     }
                 }
@@ -518,11 +523,9 @@ fun NotesListScreen(
 private fun FileOrFolderItem(
     file: File,
     storageManager: StorageManager,
-    isPinned: Boolean,
     onClick: () -> Unit,
     onRename: () -> Unit,
-    onDelete: () -> Unit,
-    onTogglePin: (() -> Unit)?
+    onDelete: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -574,18 +577,6 @@ private fun FileOrFolderItem(
                 )
             }
 
-            // Pinned indicator
-            if (isPinned) {
-                Icon(
-                    imageVector = Icons.Outlined.Bookmark,
-                    contentDescription = "Đã ghim",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .size(18.dp)
-                        .padding(end = 4.dp)
-                )
-            }
-
             // More Options Menu
             Box {
                 IconButton(onClick = { showMenu = true }, modifier = Modifier.size(32.dp)) {
@@ -600,23 +591,6 @@ private fun FileOrFolderItem(
                     expanded = showMenu,
                     onDismissRequest = { showMenu = false }
                 ) {
-                    if (onTogglePin != null) {
-                        DropdownMenuItem(
-                            text = { Text(if (isPinned) "Bỏ ghim Menu" else "Ghim làm Menu") },
-                            onClick = {
-                                showMenu = false
-                                onTogglePin()
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = if (isPinned) Icons.Outlined.BookmarkBorder else Icons.Outlined.Bookmark,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        )
-                    }
-
                     DropdownMenuItem(
                         text = { Text("Đổi tên") },
                         onClick = {
