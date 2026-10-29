@@ -7,10 +7,10 @@ import com.trinhquyetchien.markdowntray.data.CalendarEvent
 import com.trinhquyetchien.markdowntray.data.CalendarOccurrence
 import com.trinhquyetchien.markdowntray.data.CalendarRepository
 import com.trinhquyetchien.markdowntray.data.CalendarUtils
+import com.trinhquyetchien.markdowntray.data.CalendarViewMode
 import com.trinhquyetchien.markdowntray.data.DirectoryObserver
 import com.trinhquyetchien.markdowntray.data.StorageManager
 import com.trinhquyetchien.markdowntray.data.SyncStatusInfo
-import com.trinhquyetchien.markdowntray.screens.CalendarViewMode
 import java.io.File
 import java.util.Calendar
 import java.util.Date

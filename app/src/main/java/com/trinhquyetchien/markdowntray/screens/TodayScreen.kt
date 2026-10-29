@@ -4,9 +4,9 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Today
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -63,8 +63,9 @@ fun TodayScreen(
                 // Hôm trước
                 IconButton(onClick = { viewModel.selectPreviousDay() }) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Ngày trước"
+                        imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                        contentDescription = "Ngày trước",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -72,7 +73,7 @@ fun TodayScreen(
                 if (!isViewingToday) {
                     IconButton(onClick = { viewModel.selectToday() }) {
                         Icon(
-                            imageVector = Icons.Default.Today,
+                            imageVector = Icons.Outlined.Today,
                             contentDescription = "Hôm nay",
                             tint = MaterialTheme.colorScheme.primary
                         )
@@ -82,8 +83,9 @@ fun TodayScreen(
                 // Hôm sau
                 IconButton(onClick = { viewModel.selectNextDay() }) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = "Ngày sau"
+                        imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
+                        contentDescription = "Ngày sau",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             },

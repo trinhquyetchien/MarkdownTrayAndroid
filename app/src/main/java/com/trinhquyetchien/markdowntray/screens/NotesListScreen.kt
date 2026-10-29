@@ -21,24 +21,22 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.BookmarkBorder
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CreateNewFolder
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Bookmark
+import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.CreateNewFolder
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.DriveFileRenameOutline
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -48,6 +46,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
@@ -118,8 +117,9 @@ fun NotesListScreen(
                     if (uiState.currentFolder.absolutePath != uiState.rootFolder.absolutePath) {
                         IconButton(onClick = { viewModel.navigateUp() }) {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Quay lại"
+                                imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                                contentDescription = "Quay lại",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -131,18 +131,18 @@ fun NotesListScreen(
                         Toast.makeText(context, "Đã làm mới danh sách", Toast.LENGTH_SHORT).show()
                     }) {
                         Icon(
-                            imageVector = Icons.Default.Refresh,
+                            imageVector = Icons.Outlined.Refresh,
                             contentDescription = "Làm mới",
-                            tint = MaterialTheme.colorScheme.onSurface
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
                     // New Folder Button
                     IconButton(onClick = { viewModel.setShowNewFolderDialog(true) }) {
                         Icon(
-                            imageVector = Icons.Default.CreateNewFolder,
+                            imageVector = Icons.Outlined.CreateNewFolder,
                             contentDescription = "Tạo thư mục",
-                            tint = MaterialTheme.colorScheme.onSurface
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 },
@@ -157,7 +157,7 @@ fun NotesListScreen(
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Tạo ghi chú mới")
+                Icon(Icons.Outlined.Add, contentDescription = "Tạo ghi chú mới")
             }
         }
     ) { innerPadding ->
@@ -170,24 +170,24 @@ fun NotesListScreen(
             OutlinedTextField(
                 value = uiState.searchQuery,
                 onValueChange = { viewModel.setSearchQuery(it) },
-                placeholder = { Text("Tìm kiếm ghi chú hoặc thư mục...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                placeholder = { Text("Tìm kiếm ghi chú hoặc thư mục...", style = MaterialTheme.typography.bodyMedium) },
+                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                 trailingIcon = {
                     if (uiState.searchQuery.isNotEmpty()) {
                         IconButton(onClick = { viewModel.setSearchQuery("") }) {
-                            Icon(Icons.Default.Close, contentDescription = "Xóa tìm kiếm")
+                            Icon(Icons.Outlined.Close, contentDescription = "Xóa tìm kiếm", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(14.dp),
                 singleLine = true,
                 colors = TextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-                    focusedIndicatorColor = Color.Transparent,
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    focusedIndicatorColor = MaterialTheme.colorScheme.primary,
                     unfocusedIndicatorColor = Color.Transparent
                 )
             )
@@ -212,17 +212,21 @@ fun NotesListScreen(
                                     Toast.makeText(context, "Thư mục không tồn tại: ${menu.name}", Toast.LENGTH_SHORT).show()
                                 }
                             },
-                            label = { Text(menu.name, fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal) },
+                            label = { Text(menu.name, fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal) },
                             leadingIcon = {
                                 Icon(
-                                    imageVector = Icons.Default.Bookmark,
+                                    imageVector = Icons.Outlined.Bookmark,
                                     contentDescription = null,
                                     tint = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(16.dp)
                                 )
                             },
                             colors = AssistChipDefaults.assistChipColors(
-                                containerColor = if (isCurrent) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                containerColor = if (isCurrent) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                            ),
+                            border = AssistChipDefaults.assistChipBorder(
+                                enabled = true,
+                                borderColor = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
                             )
                         )
                     }
@@ -234,8 +238,8 @@ fun NotesListScreen(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 if (uiState.filesAndDirs.isEmpty()) {
                     item {
@@ -247,9 +251,9 @@ fun NotesListScreen(
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Icon(
-                                    imageVector = Icons.Default.Folder,
+                                    imageVector = Icons.Outlined.Folder,
                                     contentDescription = null,
-                                    modifier = Modifier.size(48.dp),
+                                    modifier = Modifier.size(44.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
@@ -303,7 +307,7 @@ fun NotesListScreen(
                     TopAppBar(
                         title = {
                             Column {
-                                Text(file.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                                Text(file.name, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
                                 Text(
                                     file.parentFile?.name ?: "",
                                     style = MaterialTheme.typography.bodySmall,
@@ -313,7 +317,7 @@ fun NotesListScreen(
                         },
                         navigationIcon = {
                             IconButton(onClick = { viewModel.closeActiveNote() }) {
-                                Icon(Icons.Default.Close, contentDescription = "Đóng")
+                                Icon(Icons.Outlined.Close, contentDescription = "Đóng", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
@@ -361,7 +365,7 @@ fun NotesListScreen(
         var noteTitle by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { viewModel.setShowNewFileDialog(false) },
-            title = { Text("Tạo ghi chú mới", fontWeight = FontWeight.Bold) },
+            title = { Text("Tạo ghi chú mới", fontWeight = FontWeight.SemiBold) },
             text = {
                 OutlinedTextField(
                     value = noteTitle,
@@ -384,7 +388,7 @@ fun NotesListScreen(
                         }
                     }
                 ) {
-                    Text("Tạo", fontWeight = FontWeight.Bold)
+                    Text("Tạo", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
             },
             dismissButton = {
@@ -400,7 +404,7 @@ fun NotesListScreen(
         var folderName by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { viewModel.setShowNewFolderDialog(false) },
-            title = { Text("Tạo thư mục mới", fontWeight = FontWeight.Bold) },
+            title = { Text("Tạo thư mục mới", fontWeight = FontWeight.SemiBold) },
             text = {
                 OutlinedTextField(
                     value = folderName,
@@ -425,7 +429,7 @@ fun NotesListScreen(
                         }
                     }
                 ) {
-                    Text("Tạo", fontWeight = FontWeight.Bold)
+                    Text("Tạo", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
             },
             dismissButton = {
@@ -442,7 +446,7 @@ fun NotesListScreen(
         var newName by remember { mutableStateOf(target.name) }
         AlertDialog(
             onDismissRequest = { viewModel.setTargetItemForRename(null) },
-            title = { Text("Đổi tên", fontWeight = FontWeight.Bold) },
+            title = { Text("Đổi tên", fontWeight = FontWeight.SemiBold) },
             text = {
                 OutlinedTextField(
                     value = newName,
@@ -466,7 +470,7 @@ fun NotesListScreen(
                         }
                     }
                 ) {
-                    Text("Lưu", fontWeight = FontWeight.Bold)
+                    Text("Lưu", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
             },
             dismissButton = {
@@ -482,7 +486,7 @@ fun NotesListScreen(
         val target = uiState.targetItemForDelete!!
         AlertDialog(
             onDismissRequest = { viewModel.setTargetItemForDelete(null) },
-            title = { Text("Xác nhận xóa?", fontWeight = FontWeight.Bold) },
+            title = { Text("Xác nhận xóa?", fontWeight = FontWeight.SemiBold) },
             text = {
                 Text("Bạn có chắc muốn xóa \"${target.name}\"? Toàn bộ dữ liệu sẽ bị xóa khỏi bộ nhớ thiết bị.")
             },
@@ -522,18 +526,14 @@ private fun FileOrFolderItem(
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
-    Card(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(12.dp))
             .clickable { onClick() },
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (file.isDirectory)
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-            else
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
-        )
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
             modifier = Modifier
@@ -541,12 +541,12 @@ private fun FileOrFolderItem(
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Icon
+            // Monochromatic outline icon
             Icon(
-                imageVector = if (file.isDirectory) Icons.Default.Folder else Icons.Default.Description,
+                imageVector = if (file.isDirectory) Icons.Outlined.Folder else Icons.Outlined.Description,
                 contentDescription = null,
-                tint = if (file.isDirectory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.size(28.dp)
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp)
             )
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -556,7 +556,7 @@ private fun FileOrFolderItem(
                 Text(
                     text = file.name,
                     style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = if (file.isDirectory) FontWeight.SemiBold else FontWeight.Medium,
+                    fontWeight = if (file.isDirectory) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -570,18 +570,18 @@ private fun FileOrFolderItem(
                 Text(
                     text = subInfo,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
             }
 
             // Pinned indicator
             if (isPinned) {
                 Icon(
-                    imageVector = Icons.Default.Bookmark,
+                    imageVector = Icons.Outlined.Bookmark,
                     contentDescription = "Đã ghim",
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier
-                        .size(20.dp)
+                        .size(18.dp)
                         .padding(end = 4.dp)
                 )
             }
@@ -590,9 +590,9 @@ private fun FileOrFolderItem(
             Box {
                 IconButton(onClick = { showMenu = true }, modifier = Modifier.size(32.dp)) {
                     Icon(
-                        imageVector = Icons.Default.MoreVert,
+                        imageVector = Icons.Outlined.MoreVert,
                         contentDescription = "Tùy chọn",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 }
 
@@ -609,8 +609,9 @@ private fun FileOrFolderItem(
                             },
                             leadingIcon = {
                                 Icon(
-                                    imageVector = if (isPinned) Icons.Default.BookmarkBorder else Icons.Default.Bookmark,
-                                    contentDescription = null
+                                    imageVector = if (isPinned) Icons.Outlined.BookmarkBorder else Icons.Outlined.Bookmark,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         )
@@ -622,7 +623,7 @@ private fun FileOrFolderItem(
                             showMenu = false
                             onRename()
                         },
-                        leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) }
+                        leadingIcon = { Icon(Icons.Outlined.DriveFileRenameOutline, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                     )
 
                     DropdownMenuItem(
@@ -631,7 +632,7 @@ private fun FileOrFolderItem(
                             showMenu = false
                             onDelete()
                         },
-                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) }
+                        leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) }
                     )
                 }
             }

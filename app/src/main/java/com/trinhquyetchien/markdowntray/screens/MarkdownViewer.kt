@@ -2,6 +2,7 @@ package com.trinhquyetchien.markdowntray.screens
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -17,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -25,21 +25,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.FiberManualRecord
-import androidx.compose.material.icons.filled.HourglassEmpty
-import androidx.compose.material.icons.filled.PendingActions
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.DriveFileRenameOutline
+import androidx.compose.material.icons.outlined.EditNote
+import androidx.compose.material.icons.outlined.Inbox
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -71,9 +67,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -87,9 +81,8 @@ import com.trinhquyetchien.markdowntray.data.MarkdownAnnotator
 import com.trinhquyetchien.markdowntray.data.MarkdownNode
 import com.trinhquyetchien.markdowntray.data.MarkdownParser
 import com.trinhquyetchien.markdowntray.data.SyncStatusInfo
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.trinhquyetchien.markdowntray.ui.theme.StatusGreen
+import com.trinhquyetchien.markdowntray.ui.theme.StatusOrange
 
 @Composable
 fun MarkdownViewer(
@@ -115,19 +108,17 @@ fun MarkdownViewer(
     val progress = if (totalCount > 0) completedCount.toFloat() / totalCount.toFloat() else 0f
 
     Column(modifier = modifier.fillMaxSize()) {
-        // Modern Dashboard Card
-        Card(
+        // Modern Clean Header Status Card
+        Surface(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 6.dp),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            shape = RoundedCornerShape(18.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                // Sync status line with pulsing indicator
+                // Top status row: Sync indicator & actions
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -136,25 +127,24 @@ fun MarkdownViewer(
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(8.dp))
                             .clickable { onRefresh() }
-                            .padding(vertical = 4.dp, horizontal = 6.dp)
+                            .padding(vertical = 4.dp, horizontal = 4.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(8.dp)
+                                .size(7.dp)
                                 .clip(CircleShape)
                                 .background(
-                                    if (syncInfo?.isSynced == true) Color(0xFF4CAF50)
-                                    else Color(0xFFFF9800)
+                                    if (syncInfo?.isSynced == true) StatusGreen
+                                    else StatusOrange
                                 )
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = syncInfo?.statusText ?: "Đang kiểm tra đồng bộ...",
+                            text = syncInfo?.statusText ?: "Đang đồng bộ...",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.Medium
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
@@ -164,10 +154,10 @@ fun MarkdownViewer(
                             modifier = Modifier.size(32.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Refresh,
+                                imageVector = Icons.Outlined.Refresh,
                                 contentDescription = "Làm mới",
                                 modifier = Modifier.size(18.dp),
-                                tint = MaterialTheme.colorScheme.primary
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
@@ -176,27 +166,26 @@ fun MarkdownViewer(
                             modifier = Modifier.size(32.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Edit,
+                                imageVector = Icons.Outlined.EditNote,
                                 contentDescription = "Sửa markdown",
-                                modifier = Modifier.size(18.dp),
-                                tint = MaterialTheme.colorScheme.primary
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 // Title & Progress percentage
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Bottom
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = title,
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
 
@@ -216,40 +205,44 @@ fun MarkdownViewer(
                         progress = { progress },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(4.dp)),
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp)),
                         color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        trackColor = MaterialTheme.colorScheme.outlineVariant,
                         strokeCap = StrokeCap.Round
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                    // Stat Badges
+                    // Minimal clean stats line
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        StatBadge(
-                            label = "Xong",
-                            count = completedCount,
-                            color = Color(0xFF4CAF50),
-                            icon = Icons.Default.CheckCircle,
-                            modifier = Modifier.weight(1f)
+                        Text(
+                            text = "$completedCount hoàn thành",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        StatBadge(
-                            label = "Chờ",
-                            count = pendingCount,
-                            color = Color(0xFFFF9800),
-                            icon = Icons.Default.PendingActions,
-                            modifier = Modifier.weight(1f)
+                        Text(
+                            text = "•",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                         )
-                        StatBadge(
-                            label = "Tổng",
-                            count = totalCount,
-                            color = MaterialTheme.colorScheme.primary,
-                            icon = Icons.AutoMirrored.Filled.FormatListBulleted,
-                            modifier = Modifier.weight(1f)
+                        Text(
+                            text = "$pendingCount đang chờ",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "•",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                        Text(
+                            text = "Tổng số $totalCount việc",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -261,7 +254,7 @@ fun MarkdownViewer(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             if (nodes.isEmpty()) {
@@ -269,15 +262,15 @@ fun MarkdownViewer(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 40.dp),
+                            .padding(vertical = 48.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(
-                                imageVector = Icons.Default.HourglassEmpty,
+                                imageVector = Icons.Outlined.Inbox,
                                 contentDescription = null,
-                                modifier = Modifier.size(48.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                modifier = Modifier.size(44.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
@@ -288,7 +281,7 @@ fun MarkdownViewer(
                             Text(
                                 text = "Nhập task bên dưới để bắt đầu",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                             )
                         }
                     }
@@ -324,7 +317,7 @@ fun MarkdownViewer(
                         is MarkdownNode.Divider -> {
                             HorizontalDivider(
                                 modifier = Modifier.padding(vertical = 8.dp),
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                color = MaterialTheme.colorScheme.outlineVariant
                             )
                         }
                     }
@@ -336,8 +329,7 @@ fun MarkdownViewer(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
-            shadowElevation = 8.dp
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
             Row(
                 modifier = Modifier
@@ -352,7 +344,8 @@ fun MarkdownViewer(
                     placeholder = {
                         Text(
                             text = "Thêm nhiệm vụ mới...",
-                            style = MaterialTheme.typography.bodyMedium
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
                     },
                     modifier = Modifier.weight(1f),
@@ -366,8 +359,8 @@ fun MarkdownViewer(
                         }
                     }),
                     colors = TextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                         focusedIndicatorColor = MaterialTheme.colorScheme.primary,
                         unfocusedIndicatorColor = Color.Transparent
                     )
@@ -381,21 +374,22 @@ fun MarkdownViewer(
                         }
                     },
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(42.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primary)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Add,
+                        imageVector = Icons.Outlined.Add,
                         contentDescription = "Thêm task",
-                        tint = MaterialTheme.colorScheme.onPrimary
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
         }
     }
 
-    // Markdown Editor Dialog with Syntax Toolbar & Live Preview
+    // Markdown Editor Dialog
     if (showEditDialog) {
         ModernMarkdownEditorDialog(
             initialContent = rawContent,
@@ -409,41 +403,6 @@ fun MarkdownViewer(
 }
 
 @Composable
-private fun StatBadge(
-    label: String,
-    count: Int,
-    color: Color,
-    icon: ImageVector,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        color = color.copy(alpha = 0.12f)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = "$count $label",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = color
-            )
-        }
-    }
-}
-
-@Composable
 private fun TaskCardItem(
     task: MarkdownNode.Task,
     onCheckedChange: (Boolean) -> Unit,
@@ -453,12 +412,6 @@ private fun TaskCardItem(
     var showEditDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
-    val cardBg by animateColorAsState(
-        if (task.isChecked) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
-        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-        label = "taskBg"
-    )
-
     val primaryColor = MaterialTheme.colorScheme.primary
     val secondaryColor = MaterialTheme.colorScheme.secondary
     val codeBgColor = MaterialTheme.colorScheme.surfaceVariant
@@ -467,19 +420,25 @@ private fun TaskCardItem(
         MarkdownAnnotator.annotate(task.text, primaryColor, secondaryColor, codeBgColor)
     }
 
-    Card(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = (task.indentLevel * 16).dp)
-            .clip(RoundedCornerShape(14.dp))
+            .padding(start = (task.indentLevel * 14).dp)
+            .clip(RoundedCornerShape(12.dp))
             .clickable { onCheckedChange(!task.isChecked) },
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = cardBg)
+        shape = RoundedCornerShape(12.dp),
+        color = if (task.isChecked) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+        else MaterialTheme.colorScheme.surfaceVariant,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (task.isChecked) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            else MaterialTheme.colorScheme.outlineVariant
+        )
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
+                .padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Checkbox(
@@ -487,7 +446,7 @@ private fun TaskCardItem(
                 onCheckedChange = onCheckedChange,
                 colors = CheckboxDefaults.colors(
                     checkedColor = MaterialTheme.colorScheme.primary,
-                    uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )
             )
 
@@ -497,7 +456,7 @@ private fun TaskCardItem(
                     style = MaterialTheme.typography.bodyLarge.copy(
                         textDecoration = if (task.isChecked) TextDecoration.LineThrough else TextDecoration.None
                     ),
-                    color = if (task.isChecked) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                    color = if (task.isChecked) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                     else MaterialTheme.colorScheme.onSurface,
                     fontWeight = if (task.isChecked) FontWeight.Normal else FontWeight.Medium
                 )
@@ -506,13 +465,13 @@ private fun TaskCardItem(
             if (onUpdateText != null) {
                 IconButton(
                     onClick = { showEditDialog = true },
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(28.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Edit,
+                        imageVector = Icons.Outlined.DriveFileRenameOutline,
                         contentDescription = "Sửa task",
                         modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     )
                 }
             }
@@ -520,13 +479,13 @@ private fun TaskCardItem(
             if (onDelete != null) {
                 IconButton(
                     onClick = { showDeleteConfirm = true },
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(28.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Delete,
+                        imageVector = Icons.Outlined.Delete,
                         contentDescription = "Xóa task",
                         modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f)
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     )
                 }
             }
@@ -538,7 +497,7 @@ private fun TaskCardItem(
         var editFieldValue by remember { mutableStateOf(task.text) }
         AlertDialog(
             onDismissRequest = { showEditDialog = false },
-            title = { Text("Chỉnh sửa nhiệm vụ", fontWeight = FontWeight.Bold) },
+            title = { Text("Chỉnh sửa nhiệm vụ", fontWeight = FontWeight.SemiBold) },
             text = {
                 OutlinedTextField(
                     value = editFieldValue,
@@ -556,7 +515,7 @@ private fun TaskCardItem(
                         }
                     }
                 ) {
-                    Text("Lưu", fontWeight = FontWeight.Bold)
+                    Text("Lưu", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
             },
             dismissButton = {
@@ -571,7 +530,7 @@ private fun TaskCardItem(
     if (showDeleteConfirm && onDelete != null) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Xóa nhiệm vụ?", fontWeight = FontWeight.Bold) },
+            title = { Text("Xóa nhiệm vụ?", fontWeight = FontWeight.SemiBold) },
             text = { Text("\"${task.text}\" sẽ bị xóa khỏi file.") },
             confirmButton = {
                 TextButton(
@@ -604,16 +563,15 @@ private fun BulletListItem(item: MarkdownNode.BulletList) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = (item.indentLevel * 16 + 8).dp, top = 2.dp, bottom = 2.dp),
+            .padding(start = (item.indentLevel * 14 + 6).dp, top = 2.dp, bottom = 2.dp),
         verticalAlignment = Alignment.Top
     ) {
-        Icon(
-            imageVector = Icons.Default.FiberManualRecord,
-            contentDescription = null,
+        Box(
             modifier = Modifier
-                .padding(top = 7.dp, end = 8.dp)
-                .size(6.dp),
-            tint = MaterialTheme.colorScheme.primary
+                .padding(top = 8.dp, end = 8.dp)
+                .size(5.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary)
         )
         Text(
             text = annotated,
@@ -635,15 +593,15 @@ private fun NumberedListItem(item: MarkdownNode.NumberedList) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = (item.indentLevel * 16 + 8).dp, top = 2.dp, bottom = 2.dp),
+            .padding(start = (item.indentLevel * 14 + 6).dp, top = 2.dp, bottom = 2.dp),
         verticalAlignment = Alignment.Top
     ) {
         Text(
             text = "${item.number}.",
             style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(end = 8.dp)
+            modifier = Modifier.padding(end = 6.dp)
         )
         Text(
             text = annotated,
@@ -665,15 +623,15 @@ private fun BlockQuoteItem(text: String) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 3.dp),
         shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     ) {
         Row(modifier = Modifier.padding(10.dp)) {
             Box(
                 modifier = Modifier
                     .width(3.dp)
-                    .height(24.dp)
+                    .height(20.dp)
                     .background(MaterialTheme.colorScheme.primary)
             )
             Spacer(modifier = Modifier.width(8.dp))
@@ -689,10 +647,10 @@ private fun BlockQuoteItem(text: String) {
 
 @Composable
 private fun HeaderItem(header: MarkdownNode.Header) {
-    val (style, topPadding, bottomPadding, accentColor) = when (header.level) {
-        1 -> Quadruple(MaterialTheme.typography.headlineSmall, 14.dp, 6.dp, MaterialTheme.colorScheme.primary)
-        2 -> Quadruple(MaterialTheme.typography.titleLarge, 10.dp, 4.dp, MaterialTheme.colorScheme.secondary)
-        else -> Quadruple(MaterialTheme.typography.titleMedium, 8.dp, 2.dp, MaterialTheme.colorScheme.tertiary)
+    val (style, topPadding, bottomPadding) = when (header.level) {
+        1 -> Triple(MaterialTheme.typography.headlineMedium, 12.dp, 4.dp)
+        2 -> Triple(MaterialTheme.typography.titleLarge, 10.dp, 4.dp)
+        else -> Triple(MaterialTheme.typography.titleMedium, 8.dp, 2.dp)
     }
 
     Row(
@@ -703,10 +661,10 @@ private fun HeaderItem(header: MarkdownNode.Header) {
     ) {
         Box(
             modifier = Modifier
-                .width(4.dp)
-                .height(20.dp)
+                .width(3.dp)
+                .height(18.dp)
                 .clip(RoundedCornerShape(2.dp))
-                .background(accentColor)
+                .background(MaterialTheme.colorScheme.primary)
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
@@ -717,8 +675,6 @@ private fun HeaderItem(header: MarkdownNode.Header) {
         )
     }
 }
-
-private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 
 @Composable
 private fun NormalTextItem(item: MarkdownNode.NormalText) {
@@ -768,21 +724,21 @@ fun ModernMarkdownEditorDialog(
                 TopAppBar(
                     title = {
                         Text(
-                            text = "Chỉnh sửa Markdown",
-                            fontWeight = FontWeight.Bold,
+                            text = "Soạn thảo Markdown",
+                            fontWeight = FontWeight.SemiBold,
                             style = MaterialTheme.typography.titleMedium
                         )
                     },
                     navigationIcon = {
                         IconButton(onClick = onDismiss) {
-                            Icon(Icons.Default.Close, contentDescription = "Đóng")
+                            Icon(Icons.Outlined.Close, contentDescription = "Đóng")
                         }
                     },
                     actions = {
                         TextButton(onClick = { onSave(textFieldValue.text) }) {
-                            Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Lưu", fontWeight = FontWeight.Bold)
+                            Text("Lưu", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -793,62 +749,50 @@ fun ModernMarkdownEditorDialog(
             bottomBar = {
                 if (selectedTab == 0) {
                     Surface(
-                        tonalElevation = 4.dp,
+                        color = MaterialTheme.colorScheme.surface,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .horizontalScroll(rememberScrollState())
-                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            EditorToolButton(text = "[ ] Task") { insertSyntax("\n- [ ] ") }
-                            EditorToolButton(text = "# H1") { insertSyntax("\n# ") }
-                            EditorToolButton(text = "## H2") { insertSyntax("\n## ") }
-                            EditorToolButton(text = "**B**") { insertSyntax("**", "**") }
-                            EditorToolButton(text = "*I*") { insertSyntax("*", "*") }
-                            EditorToolButton(text = "`Code`") { insertSyntax("`", "`") }
-                            EditorToolButton(text = "- List") { insertSyntax("\n- ") }
-                            EditorToolButton(text = "1. List") { insertSyntax("\n1. ") }
-                            EditorToolButton(text = "> Quote") { insertSyntax("\n> ") }
-                            EditorToolButton(text = "📅 Ngày") {
-                                val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-                                insertSyntax(" $today ")
-                            }
-                            EditorToolButton(text = "---") { insertSyntax("\n---\n") }
+                            ToolbarButton(label = "Task", onClick = { insertSyntax("- [ ] ") })
+                            ToolbarButton(label = "B", onClick = { insertSyntax("**", "**") })
+                            ToolbarButton(label = "I", onClick = { insertSyntax("*", "*") })
+                            ToolbarButton(label = "H1", onClick = { insertSyntax("# ") })
+                            ToolbarButton(label = "H2", onClick = { insertSyntax("## ") })
+                            ToolbarButton(label = "H3", onClick = { insertSyntax("### ") })
+                            ToolbarButton(label = "List", onClick = { insertSyntax("- ") })
+                            ToolbarButton(label = "Quote", onClick = { insertSyntax("> ") })
+                            ToolbarButton(label = "Code", onClick = { insertSyntax("`", "`") })
                         }
                     }
                 }
             }
-        ) { padding ->
+        ) { innerPadding ->
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
+                    .padding(innerPadding)
             ) {
-                PrimaryTabRow(selectedTabIndex = selectedTab) {
+                PrimaryTabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.primary
+                ) {
                     Tab(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Soạn thảo")
-                            }
-                        }
+                        text = { Text("Soạn thảo", fontWeight = FontWeight.Medium) }
                     )
                     Tab(
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Xem trước")
-                            }
-                        }
+                        text = { Text("Xem trước", fontWeight = FontWeight.Medium) }
                     )
                 }
 
@@ -859,10 +803,12 @@ fun ModernMarkdownEditorDialog(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(16.dp),
-                        placeholder = { Text("Nội dung markdown...") },
-                        textStyle = MaterialTheme.typography.bodyMedium.copy(
-                            fontFamily = FontFamily.Monospace,
-                            lineHeight = 22.sp
+                        shape = RoundedCornerShape(12.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent
                         )
                     )
                 } else {
@@ -873,41 +819,15 @@ fun ModernMarkdownEditorDialog(
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        items(previewNodes) { node ->
+                        itemsIndexed(previewNodes) { _, node ->
                             when (node) {
-                                is MarkdownNode.Task -> {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(vertical = 4.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = if (node.isChecked) Icons.Default.CheckCircle else Icons.Default.PendingActions,
-                                            contentDescription = null,
-                                            tint = if (node.isChecked) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = MarkdownAnnotator.annotate(
-                                                node.text,
-                                                MaterialTheme.colorScheme.primary,
-                                                MaterialTheme.colorScheme.secondary,
-                                                MaterialTheme.colorScheme.surfaceVariant
-                                            ),
-                                            style = MaterialTheme.typography.bodyMedium.copy(
-                                                textDecoration = if (node.isChecked) TextDecoration.LineThrough else TextDecoration.None
-                                            ),
-                                            color = if (node.isChecked) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                                            else MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                }
+                                is MarkdownNode.Task -> TaskCardItem(task = node, onCheckedChange = {})
                                 is MarkdownNode.Header -> HeaderItem(header = node)
                                 is MarkdownNode.BulletList -> BulletListItem(item = node)
                                 is MarkdownNode.NumberedList -> NumberedListItem(item = node)
                                 is MarkdownNode.BlockQuote -> BlockQuoteItem(text = node.text)
                                 is MarkdownNode.NormalText -> NormalTextItem(item = node)
-                                is MarkdownNode.Divider -> HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
+                                is MarkdownNode.Divider -> HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                             }
                         }
                     }
@@ -918,13 +838,18 @@ fun ModernMarkdownEditorDialog(
 }
 
 @Composable
-private fun EditorToolButton(text: String, onClick: () -> Unit) {
-    AssistChip(
-        onClick = onClick,
-        label = { Text(text = text, style = MaterialTheme.typography.labelSmall) },
+private fun ToolbarButton(label: String, onClick: () -> Unit) {
+    Surface(
         shape = RoundedCornerShape(8.dp),
-        colors = AssistChipDefaults.assistChipColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.clickable { onClick() }
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
         )
-    )
+    }
 }

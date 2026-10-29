@@ -9,23 +9,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.FolderShared
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.RestartAlt
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Bookmark
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.RestartAlt
+import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -57,7 +55,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trinhquyetchien.markdowntray.data.StorageManager
 import com.trinhquyetchien.markdowntray.viewmodel.AppViewModelFactory
 import com.trinhquyetchien.markdowntray.viewmodel.SettingsViewModel
-import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -113,14 +110,10 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Permission Card
-            Card(
+            Surface(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (uiState.hasStoragePermission)
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                    else
-                        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
-                ),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -128,7 +121,7 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = if (uiState.hasStoragePermission) Icons.Default.CheckCircle else Icons.Default.Warning,
+                        imageVector = if (uiState.hasStoragePermission) Icons.Outlined.CheckCircle else Icons.Outlined.Warning,
                         contentDescription = null,
                         tint = if (uiState.hasStoragePermission) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(end = 12.dp)
@@ -137,7 +130,7 @@ fun SettingsScreen(
                         Text(
                             text = if (uiState.hasStoragePermission) "Đã cấp quyền truy cập bộ nhớ" else "Chưa cấp quyền bộ nhớ ngoài",
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.SemiBold
                         )
                         Text(
                             text = if (uiState.hasStoragePermission)
@@ -167,19 +160,20 @@ fun SettingsScreen(
             }
 
             // Path Configuration Card
-            Card(
+            Surface(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Outlined.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Đường dẫn thư mục & tệp (Syncthing)",
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
 
@@ -247,7 +241,7 @@ fun SettingsScreen(
                                 Toast.makeText(context, "Đã khôi phục mặc định", Toast.LENGTH_SHORT).show()
                             }
                         ) {
-                            Icon(Icons.Default.RestartAlt, contentDescription = null)
+                            Icon(Icons.Outlined.RestartAlt, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Mặc định")
                         }
@@ -267,18 +261,19 @@ fun SettingsScreen(
                                 Toast.makeText(context, "Đã lưu cài đặt", Toast.LENGTH_SHORT).show()
                             }
                         ) {
-                            Icon(Icons.Default.Save, contentDescription = null)
+                            Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Lưu cấu hình")
+                            Text("Lưu cấu hình", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
 
             // Custom Menus Management Card
-            Card(
+            Surface(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -288,17 +283,17 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Bookmark, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Outlined.Bookmark, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "Lối tắt Custom Menus",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
 
                         IconButton(onClick = { showAddMenuDialog = true }) {
-                            Icon(Icons.Default.Add, contentDescription = "Thêm Menu")
+                            Icon(Icons.Outlined.Add, contentDescription = "Thêm Menu", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
 
@@ -319,6 +314,7 @@ fun SettingsScreen(
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
                                 color = MaterialTheme.colorScheme.surface,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Row(
@@ -339,7 +335,7 @@ fun SettingsScreen(
                                             Toast.makeText(context, "Đã xóa ${menu.name}", Toast.LENGTH_SHORT).show()
                                         }
                                     ) {
-                                        Icon(Icons.Default.Close, contentDescription = "Xóa menu", tint = MaterialTheme.colorScheme.error)
+                                        Icon(Icons.Outlined.Close, contentDescription = "Xóa menu", tint = MaterialTheme.colorScheme.error)
                                     }
                                 }
                             }
@@ -357,7 +353,7 @@ fun SettingsScreen(
 
         AlertDialog(
             onDismissRequest = { showAddMenuDialog = false },
-            title = { Text("Thêm Custom Menu", fontWeight = FontWeight.Bold) },
+            title = { Text("Thêm Custom Menu", fontWeight = FontWeight.SemiBold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -388,7 +384,7 @@ fun SettingsScreen(
                         }
                     }
                 ) {
-                    Text("Thêm", fontWeight = FontWeight.Bold)
+                    Text("Thêm", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
             },
             dismissButton = {

@@ -24,15 +24,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.outlined.AccessTime
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -73,17 +74,17 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trinhquyetchien.markdowntray.data.CalendarEvent
 import com.trinhquyetchien.markdowntray.data.CalendarOccurrence
 import com.trinhquyetchien.markdowntray.data.CalendarUtils
+import com.trinhquyetchien.markdowntray.data.CalendarViewMode
 import com.trinhquyetchien.markdowntray.data.StorageManager
+import com.trinhquyetchien.markdowntray.data.SyncStatusInfo
+import com.trinhquyetchien.markdowntray.ui.theme.StatusGreen
+import com.trinhquyetchien.markdowntray.ui.theme.StatusOrange
 import com.trinhquyetchien.markdowntray.viewmodel.AppViewModelFactory
 import com.trinhquyetchien.markdowntray.viewmodel.CalendarViewModel
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-
-enum class CalendarViewMode {
-    DAY, WEEK, MONTH
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -130,8 +131,8 @@ fun CalendarScreen(
                                     .size(7.dp)
                                     .clip(CircleShape)
                                     .background(
-                                        if (uiState.syncInfo?.isSynced == true) Color(0xFF4CAF50)
-                                        else Color(0xFFFF9800)
+                                        if (uiState.syncInfo?.isSynced == true) StatusGreen
+                                        else StatusOrange
                                     )
                             )
                             Spacer(modifier = Modifier.width(6.dp))
@@ -149,9 +150,9 @@ fun CalendarScreen(
                         Toast.makeText(context, "Đã làm mới lịch", Toast.LENGTH_SHORT).show()
                     }) {
                         Icon(
-                            imageVector = Icons.Default.Refresh,
+                            imageVector = Icons.Outlined.Refresh,
                             contentDescription = "Làm mới",
-                            tint = MaterialTheme.colorScheme.onSurface
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 },
@@ -166,7 +167,7 @@ fun CalendarScreen(
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Thêm sự kiện")
+                Icon(Icons.Outlined.Add, contentDescription = "Thêm sự kiện")
             }
         }
     ) { innerPadding ->
@@ -177,7 +178,8 @@ fun CalendarScreen(
         ) {
             // Header Controls: View mode switcher (Day, Week, Month)
             Surface(
-                tonalElevation = 2.dp,
+                color = MaterialTheme.colorScheme.surface,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -193,13 +195,14 @@ fun CalendarScreen(
                             onClick = { viewModel.navigatePrevious() },
                             modifier = Modifier.size(36.dp)
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Trước", modifier = Modifier.size(20.dp))
+                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Trước", modifier = Modifier.size(18.dp))
                         }
 
                         TextButton(onClick = { viewModel.navigateToday() }) {
                             Text(
                                 text = if (uiState.selectedYMD == uiState.todayYMD) "Hôm nay" else "Về hôm nay",
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
 
@@ -207,15 +210,15 @@ fun CalendarScreen(
                             onClick = { viewModel.navigateNext() },
                             modifier = Modifier.size(36.dp)
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Sau", modifier = Modifier.size(20.dp))
+                            Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = "Sau", modifier = Modifier.size(18.dp))
                         }
                     }
 
                     // Mode switch tabs
                     Row(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
                             .padding(2.dp)
                     ) {
                         ViewModeButton(
@@ -368,7 +371,7 @@ fun CalendarScreen(
                     showRecurringChoiceDialog = false
                     pendingAction = null
                 },
-                title = { Text("Lặp lại sự kiện", fontWeight = FontWeight.Bold) },
+                title = { Text("Lặp lại sự kiện", fontWeight = FontWeight.SemiBold) },
                 text = { Text("Bạn muốn áp dụng thay đổi này chỉ cho ngày này hay toàn bộ chuỗi sự kiện?") },
                 confirmButton = {
                     TextButton(onClick = {
@@ -377,7 +380,7 @@ fun CalendarScreen(
                         pendingAction = null
                         viewModel.setEditingOccurrence(null)
                     }) {
-                        Text("Tất cả sự kiện", fontWeight = FontWeight.Bold)
+                        Text("Tất cả sự kiện", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
                 },
                 dismissButton = {
@@ -402,13 +405,13 @@ private fun ViewModeButton(
     onClick: () -> Unit
 ) {
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(12.dp),
         color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
         modifier = Modifier.clickable { onClick() }
     ) {
         Text(
             text = label,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
             style = MaterialTheme.typography.labelMedium,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
             color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
@@ -433,9 +436,9 @@ private fun DayScheduleView(
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
-                    imageVector = Icons.Default.Event,
+                    imageVector = Icons.Outlined.Event,
                     contentDescription = null,
-                    modifier = Modifier.size(54.dp),
+                    modifier = Modifier.size(48.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -445,9 +448,9 @@ private fun DayScheduleView(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "Bấm dấu + góc dưới để tạo sự kiện mới",
+                    text = "Bấm dấu + để thêm sự kiện mới",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )
             }
         }
@@ -455,8 +458,8 @@ private fun DayScheduleView(
         LazyColumn(
             modifier = modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(occurrences, key = { "${it.event.id}_${it.startHour}_${it.startMinute}" }) { occ ->
                 EventCard(
@@ -489,28 +492,27 @@ private fun EventCard(
         occurrence.endMinute
     )
 
-    Card(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(14.dp))
             .clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = eventColor.copy(alpha = 0.12f)
-        )
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Color accent bar
             Box(
                 modifier = Modifier
-                    .width(5.dp)
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(3.dp))
+                    .width(4.dp)
+                    .height(42.dp)
+                    .clip(RoundedCornerShape(2.dp))
                     .background(eventColor)
             )
 
@@ -521,7 +523,7 @@ private fun EventCard(
                     Text(
                         text = ev.title,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -531,19 +533,19 @@ private fun EventCard(
                     if (occurrence.isRecurring) {
                         Spacer(modifier = Modifier.width(4.dp))
                         Icon(
-                            imageVector = Icons.Default.Repeat,
+                            imageVector = Icons.Outlined.Repeat,
                             contentDescription = "Lặp lại",
                             modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(3.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Default.AccessTime,
+                        imageVector = Icons.Outlined.AccessTime,
                         contentDescription = null,
                         modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -558,11 +560,11 @@ private fun EventCard(
                 }
 
                 if (ev.note.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
                     Text(
                         text = ev.note,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -610,7 +612,7 @@ private fun WeekScheduleView(
                         .clip(RoundedCornerShape(12.dp))
                         .background(
                             if (isSelected) MaterialTheme.colorScheme.primary
-                            else if (isToday) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                            else if (isToday) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                             else Color.Transparent
                         )
                         .clickable { onSelectDate(ymd, dateCal) }
@@ -632,7 +634,7 @@ private fun WeekScheduleView(
                     // Event indicator dot
                     val dayOccs = CalendarUtils.getOccurrencesForDate(allEvents, ymd)
                     if (dayOccs.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(3.dp))
                         Box(
                             modifier = Modifier
                                 .size(4.dp)
@@ -640,13 +642,13 @@ private fun WeekScheduleView(
                                 .background(if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary)
                         )
                     } else {
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(7.dp))
                     }
                 }
             }
         }
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
         // Schedule of the selected date in week
         val currentDayOccurrences = remember(allEvents, selectedYMD) {
@@ -702,7 +704,7 @@ private fun MonthScheduleView(
             }
         }
 
-        HorizontalDivider()
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
         // 6 rows x 7 columns grid
         Column(
@@ -789,7 +791,7 @@ private fun EventEditDialog(
 
     var title by remember { mutableStateOf(existingEvent?.title ?: "") }
     var note by remember { mutableStateOf(existingEvent?.note ?: "") }
-    var selectedColor by remember { mutableStateOf(existingEvent?.color ?: "#0a84ff") }
+    var selectedColor by remember { mutableStateOf(existingEvent?.color ?: "#0F766E") }
 
     var dateStr by remember { mutableStateOf(occurrenceDate) }
 
@@ -811,14 +813,14 @@ private fun EventEditDialog(
     }
 
     val colorOptions = listOf(
-        "#0a84ff", // Xanh dương
-        "#30d158", // Xanh lá
-        "#ff9f0a", // Cam
-        "#ff453a", // Đỏ
-        "#bf5af2", // Tím
-        "#64d2ff", // Lam nhạt
-        "#ffd60a", // Vàng
-        "#8e8e93"  // Xám
+        "#0F766E", // Emerald (Mặc định)
+        "#2DD4BF", // Mint
+        "#3B82F6", // Blue
+        "#10B981", // Green
+        "#F59E0B", // Amber
+        "#EF4444", // Red
+        "#8B5CF6", // Purple
+        "#64748B"  // Slate
     )
 
     val weekDays = listOf(
@@ -838,9 +840,9 @@ private fun EventEditDialog(
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.92f)
-                .clip(RoundedCornerShape(24.dp)),
+                .clip(RoundedCornerShape(20.dp)),
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
             Column(
                 modifier = Modifier
@@ -859,7 +861,7 @@ private fun EventEditDialog(
                         fontWeight = FontWeight.Bold
                     )
                     IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Đóng")
+                        Icon(Icons.Outlined.Close, contentDescription = "Đóng", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
@@ -873,7 +875,7 @@ private fun EventEditDialog(
                     placeholder = { Text("Bạn định làm gì?") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    shape = RoundedCornerShape(14.dp)
+                    shape = RoundedCornerShape(12.dp)
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -885,7 +887,7 @@ private fun EventEditDialog(
                     label = { Text("Ghi chú / Mô tả") },
                     modifier = Modifier.fillMaxWidth(),
                     maxLines = 3,
-                    shape = RoundedCornerShape(14.dp)
+                    shape = RoundedCornerShape(12.dp)
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -907,8 +909,8 @@ private fun EventEditDialog(
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Bắt đầu", style = MaterialTheme.typography.labelSmall)
-                            Text(startTime, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text("Bắt đầu", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(startTime, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                         }
                     }
 
@@ -924,8 +926,8 @@ private fun EventEditDialog(
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Kết thúc", style = MaterialTheme.typography.labelSmall)
-                            Text(endTime, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text("Kết thúc", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(endTime, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                         }
                     }
                 }
@@ -1000,7 +1002,7 @@ private fun EventEditDialog(
                 ) {
                     if (onDelete != null) {
                         IconButton(onClick = onDelete) {
-                            Icon(Icons.Default.Delete, contentDescription = "Xóa sự kiện", tint = MaterialTheme.colorScheme.error)
+                            Icon(Icons.Outlined.Delete, contentDescription = "Xóa sự kiện", tint = MaterialTheme.colorScheme.error)
                         }
                         Spacer(modifier = Modifier.weight(1f))
                     }
@@ -1030,7 +1032,7 @@ private fun EventEditDialog(
                             )
                             onSave(event)
                         },
-                        shape = RoundedCornerShape(14.dp)
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         Text("Lưu", fontWeight = FontWeight.Bold)
                     }

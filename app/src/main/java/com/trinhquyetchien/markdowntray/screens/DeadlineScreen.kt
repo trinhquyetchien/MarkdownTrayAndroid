@@ -4,7 +4,7 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,9 +50,9 @@ fun DeadlineScreen(
                     Toast.makeText(context, "Đã làm mới Deadline", Toast.LENGTH_SHORT).show()
                 }) {
                     Icon(
-                        imageVector = Icons.Default.Refresh,
+                        imageVector = Icons.Outlined.Refresh,
                         contentDescription = "Làm mới",
-                        tint = MaterialTheme.colorScheme.onSurface
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             },

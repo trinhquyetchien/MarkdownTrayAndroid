@@ -3,12 +3,13 @@ package com.trinhquyetchien.markdowntray.screens
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AssignmentLate
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Today
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -23,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trinhquyetchien.markdowntray.data.StorageManager
 
@@ -38,7 +40,8 @@ fun MainScreen(
         bottomBar = {
             NavigationBar(
                 containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.onSurface
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                tonalElevation = 0.dp
             ) {
                 // 1. Today Tab
                 NavigationBarItem(
@@ -46,21 +49,24 @@ fun MainScreen(
                     onClick = { selectedTabIndex = 0 },
                     icon = {
                         Icon(
-                            imageVector = Icons.Default.Today,
-                            contentDescription = "Hôm nay"
+                            imageVector = Icons.Outlined.CheckCircle,
+                            contentDescription = "Hôm nay",
+                            modifier = Modifier.size(22.dp)
                         )
                     },
                     label = {
                         Text(
                             text = "Hôm nay",
                             fontSize = 11.sp,
-                            fontWeight = if (selectedTabIndex == 0) FontWeight.Bold else FontWeight.Normal
+                            fontWeight = if (selectedTabIndex == 0) FontWeight.SemiBold else FontWeight.Normal
                         )
                     },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = MaterialTheme.colorScheme.primary,
                         selectedTextColor = MaterialTheme.colorScheme.primary,
-                        indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                     )
                 )
 
@@ -70,21 +76,24 @@ fun MainScreen(
                     onClick = { selectedTabIndex = 1 },
                     icon = {
                         Icon(
-                            imageVector = Icons.Default.CalendarMonth,
-                            contentDescription = "Lịch"
+                            imageVector = Icons.Outlined.CalendarMonth,
+                            contentDescription = "Lịch",
+                            modifier = Modifier.size(22.dp)
                         )
                     },
                     label = {
                         Text(
                             text = "Lịch",
                             fontSize = 11.sp,
-                            fontWeight = if (selectedTabIndex == 1) FontWeight.Bold else FontWeight.Normal
+                            fontWeight = if (selectedTabIndex == 1) FontWeight.SemiBold else FontWeight.Normal
                         )
                     },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = MaterialTheme.colorScheme.primary,
                         selectedTextColor = MaterialTheme.colorScheme.primary,
-                        indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                     )
                 )
 
@@ -94,21 +103,24 @@ fun MainScreen(
                     onClick = { selectedTabIndex = 2 },
                     icon = {
                         Icon(
-                            imageVector = Icons.Default.AssignmentLate,
-                            contentDescription = "Deadline"
+                            imageVector = Icons.Outlined.Schedule,
+                            contentDescription = "Deadline",
+                            modifier = Modifier.size(22.dp)
                         )
                     },
                     label = {
                         Text(
                             text = "Deadline",
                             fontSize = 11.sp,
-                            fontWeight = if (selectedTabIndex == 2) FontWeight.Bold else FontWeight.Normal
+                            fontWeight = if (selectedTabIndex == 2) FontWeight.SemiBold else FontWeight.Normal
                         )
                     },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = MaterialTheme.colorScheme.primary,
                         selectedTextColor = MaterialTheme.colorScheme.primary,
-                        indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                     )
                 )
 
@@ -118,21 +130,24 @@ fun MainScreen(
                     onClick = { selectedTabIndex = 3 },
                     icon = {
                         Icon(
-                            imageVector = Icons.Default.FolderOpen,
-                            contentDescription = "List"
+                            imageVector = Icons.Outlined.Folder,
+                            contentDescription = "List",
+                            modifier = Modifier.size(22.dp)
                         )
                     },
                     label = {
                         Text(
                             text = "List",
                             fontSize = 11.sp,
-                            fontWeight = if (selectedTabIndex == 3) FontWeight.Bold else FontWeight.Normal
+                            fontWeight = if (selectedTabIndex == 3) FontWeight.SemiBold else FontWeight.Normal
                         )
                     },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = MaterialTheme.colorScheme.primary,
                         selectedTextColor = MaterialTheme.colorScheme.primary,
-                        indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                     )
                 )
 
@@ -142,21 +157,24 @@ fun MainScreen(
                     onClick = { selectedTabIndex = 4 },
                     icon = {
                         Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Cài đặt"
+                            imageVector = Icons.Outlined.Settings,
+                            contentDescription = "Cài đặt",
+                            modifier = Modifier.size(22.dp)
                         )
                     },
                     label = {
                         Text(
                             text = "Cài đặt",
                             fontSize = 11.sp,
-                            fontWeight = if (selectedTabIndex == 4) FontWeight.Bold else FontWeight.Normal
+                            fontWeight = if (selectedTabIndex == 4) FontWeight.SemiBold else FontWeight.Normal
                         )
                     },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = MaterialTheme.colorScheme.primary,
                         selectedTextColor = MaterialTheme.colorScheme.primary,
-                        indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                     )
                 )
             }
