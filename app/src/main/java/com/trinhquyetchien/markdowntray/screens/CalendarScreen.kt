@@ -2,18 +2,13 @@ package com.trinhquyetchien.markdowntray.screens
 
 import android.app.TimePickerDialog
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -33,24 +28,16 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.CalendarViewDay
-import androidx.compose.material.icons.filled.CalendarViewWeek
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -58,19 +45,15 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -84,17 +67,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.trinhquyetchien.markdowntray.alarm.CalendarAlarmScheduler
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trinhquyetchien.markdowntray.data.CalendarEvent
 import com.trinhquyetchien.markdowntray.data.CalendarOccurrence
-import com.trinhquyetchien.markdowntray.data.CalendarRepository
 import com.trinhquyetchien.markdowntray.data.CalendarUtils
 import com.trinhquyetchien.markdowntray.data.StorageManager
-import com.trinhquyetchien.markdowntray.data.SyncStatusInfo
-import java.io.File
+import com.trinhquyetchien.markdowntray.viewmodel.AppViewModelFactory
+import com.trinhquyetchien.markdowntray.viewmodel.CalendarViewModel
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -108,63 +89,16 @@ enum class CalendarViewMode {
 @Composable
 fun CalendarScreen(
     storageManager: StorageManager,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: CalendarViewModel = viewModel(
+        factory = AppViewModelFactory(LocalContext.current, storageManager)
+    )
 ) {
     val context = LocalContext.current
-    var events by remember { mutableStateOf<List<CalendarEvent>>(emptyList()) }
-    var syncInfo by remember { mutableStateOf<SyncStatusInfo?>(null) }
-    var viewMode by remember { mutableStateOf(CalendarViewMode.DAY) }
+    val uiState by viewModel.uiState.collectAsState()
 
-    val todayCalendar = remember { Calendar.getInstance() }
-    val todayYMD = remember { CalendarUtils.formatYMD(todayCalendar.time) }
-
-    var selectedCalendar by remember { mutableStateOf(Calendar.getInstance()) }
-    var selectedYMD by remember { mutableStateOf(CalendarUtils.formatYMD(selectedCalendar.time)) }
-
-    var editingOccurrence by remember { mutableStateOf<CalendarOccurrence?>(null) }
-    var showNewEventDialog by remember { mutableStateOf(false) }
-
-    fun reloadData() {
-        val file = storageManager.getCalendarFile()
-        events = CalendarRepository.loadEvents(file)
-        syncInfo = storageManager.getFileSyncInfo(file)
-        CalendarAlarmScheduler.scheduleUpcomingAlarms(context, storageManager)
-    }
-
-    fun saveAllEvents(newEvents: List<CalendarEvent>) {
-        val file = storageManager.getCalendarFile()
-        events = newEvents
-        val success = CalendarRepository.saveEvents(file, newEvents)
-        if (success) {
-            syncInfo = storageManager.getFileSyncInfo(file)
-            CalendarAlarmScheduler.scheduleUpcomingAlarms(context, storageManager)
-            Toast.makeText(context, "Đã lưu lịch biểu", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(context, "Lỗi khi lưu lịch biểu", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    LaunchedEffect(storageManager.calendarFilePath) {
-        reloadData()
-    }
-
-    // Auto-reload via DirectoryObserver when Syncthing writes calendar.json
-    DisposableEffect(storageManager.calendarFilePath) {
-        val file = storageManager.getCalendarFile()
-        val parentDir = file.parentFile ?: File(StorageManager.DEFAULT_STORAGE_ROOT)
-        val observer = storageManager.createDirectoryObserver(parentDir) { changedPath ->
-            if (changedPath == null || changedPath == file.name) {
-                reloadData()
-            }
-        }
-        observer.start()
-        onDispose {
-            observer.stop()
-        }
-    }
-
-    val dayOccurrences = remember(events, selectedYMD) {
-        CalendarUtils.getOccurrencesForDate(events, selectedYMD)
+    val dayOccurrences = remember(uiState.events, uiState.selectedYMD) {
+        CalendarUtils.getOccurrencesForDate(uiState.events, uiState.selectedYMD)
     }
 
     Scaffold(
@@ -187,7 +121,7 @@ fun CalendarScreen(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable {
-                                    reloadData()
+                                    viewModel.loadEvents()
                                     Toast.makeText(context, "Đã kiểm tra đồng bộ", Toast.LENGTH_SHORT).show()
                                 }
                         ) {
@@ -196,13 +130,13 @@ fun CalendarScreen(
                                     .size(7.dp)
                                     .clip(CircleShape)
                                     .background(
-                                        if (syncInfo?.isSynced == true) Color(0xFF4CAF50)
+                                        if (uiState.syncInfo?.isSynced == true) Color(0xFF4CAF50)
                                         else Color(0xFFFF9800)
                                     )
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = syncInfo?.statusText ?: "Đang kiểm tra...",
+                                text = uiState.syncInfo?.statusText ?: "Đang kiểm tra...",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -211,7 +145,7 @@ fun CalendarScreen(
                 },
                 actions = {
                     IconButton(onClick = {
-                        reloadData()
+                        viewModel.loadEvents()
                         Toast.makeText(context, "Đã làm mới lịch", Toast.LENGTH_SHORT).show()
                     }) {
                         Icon(
@@ -228,7 +162,7 @@ fun CalendarScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { showNewEventDialog = true },
+                onClick = { viewModel.setShowNewEventDialog(true) },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             ) {
@@ -256,42 +190,21 @@ fun CalendarScreen(
                     // Navigation prev/today/next
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(
-                            onClick = {
-                                val cal = selectedCalendar.clone() as Calendar
-                                when (viewMode) {
-                                    CalendarViewMode.DAY -> cal.add(Calendar.DAY_OF_YEAR, -1)
-                                    CalendarViewMode.WEEK -> cal.add(Calendar.WEEK_OF_YEAR, -1)
-                                    CalendarViewMode.MONTH -> cal.add(Calendar.MONTH, -1)
-                                }
-                                selectedCalendar = cal
-                                selectedYMD = CalendarUtils.formatYMD(cal.time)
-                            },
+                            onClick = { viewModel.navigatePrevious() },
                             modifier = Modifier.size(36.dp)
                         ) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Trước", modifier = Modifier.size(20.dp))
                         }
 
-                        TextButton(onClick = {
-                            selectedCalendar = Calendar.getInstance()
-                            selectedYMD = CalendarUtils.formatYMD(selectedCalendar.time)
-                        }) {
+                        TextButton(onClick = { viewModel.navigateToday() }) {
                             Text(
-                                text = if (selectedYMD == todayYMD) "Hôm nay" else "Về hôm nay",
+                                text = if (uiState.selectedYMD == uiState.todayYMD) "Hôm nay" else "Về hôm nay",
                                 fontWeight = FontWeight.Bold
                             )
                         }
 
                         IconButton(
-                            onClick = {
-                                val cal = selectedCalendar.clone() as Calendar
-                                when (viewMode) {
-                                    CalendarViewMode.DAY -> cal.add(Calendar.DAY_OF_YEAR, 1)
-                                    CalendarViewMode.WEEK -> cal.add(Calendar.WEEK_OF_YEAR, 1)
-                                    CalendarViewMode.MONTH -> cal.add(Calendar.MONTH, 1)
-                                }
-                                selectedCalendar = cal
-                                selectedYMD = CalendarUtils.formatYMD(cal.time)
-                            },
+                            onClick = { viewModel.navigateNext() },
                             modifier = Modifier.size(36.dp)
                         ) {
                             Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Sau", modifier = Modifier.size(20.dp))
@@ -307,28 +220,28 @@ fun CalendarScreen(
                     ) {
                         ViewModeButton(
                             label = "Ngày",
-                            selected = viewMode == CalendarViewMode.DAY,
-                            onClick = { viewMode = CalendarViewMode.DAY }
+                            selected = uiState.viewMode == CalendarViewMode.DAY,
+                            onClick = { viewModel.setViewMode(CalendarViewMode.DAY) }
                         )
                         ViewModeButton(
                             label = "Tuần",
-                            selected = viewMode == CalendarViewMode.WEEK,
-                            onClick = { viewMode = CalendarViewMode.WEEK }
+                            selected = uiState.viewMode == CalendarViewMode.WEEK,
+                            onClick = { viewModel.setViewMode(CalendarViewMode.WEEK) }
                         )
                         ViewModeButton(
                             label = "Tháng",
-                            selected = viewMode == CalendarViewMode.MONTH,
-                            onClick = { viewMode = CalendarViewMode.MONTH }
+                            selected = uiState.viewMode == CalendarViewMode.MONTH,
+                            onClick = { viewModel.setViewMode(CalendarViewMode.MONTH) }
                         )
                     }
                 }
             }
 
             // Current date title banner
-            val headerTitle = when (viewMode) {
-                CalendarViewMode.DAY -> SimpleDateFormat("EEEE, dd MMMM yyyy", Locale.forLanguageTag("vi-VN")).format(selectedCalendar.time)
-                CalendarViewMode.WEEK -> "Tuần ${selectedCalendar.get(Calendar.WEEK_OF_YEAR)} - Tháng ${selectedCalendar.get(Calendar.MONTH) + 1}/${selectedCalendar.get(Calendar.YEAR)}"
-                CalendarViewMode.MONTH -> SimpleDateFormat("MMMM yyyy", Locale.forLanguageTag("vi-VN")).format(selectedCalendar.time)
+            val headerTitle = when (uiState.viewMode) {
+                CalendarViewMode.DAY -> SimpleDateFormat("EEEE, dd MMMM yyyy", Locale.forLanguageTag("vi-VN")).format(uiState.selectedCalendar.time)
+                CalendarViewMode.WEEK -> "Tuần ${uiState.selectedCalendar.get(Calendar.WEEK_OF_YEAR)} - Tháng ${uiState.selectedCalendar.get(Calendar.MONTH) + 1}/${uiState.selectedCalendar.get(Calendar.YEAR)}"
+                CalendarViewMode.MONTH -> SimpleDateFormat("MMMM yyyy", Locale.forLanguageTag("vi-VN")).format(uiState.selectedCalendar.time)
             }
             Text(
                 text = headerTitle.replaceFirstChar { it.uppercase() },
@@ -339,37 +252,33 @@ fun CalendarScreen(
             )
 
             // Content body according to view mode
-            when (viewMode) {
+            when (uiState.viewMode) {
                 CalendarViewMode.DAY -> {
                     DayScheduleView(
-                        selectedDateYMD = selectedYMD,
+                        selectedDateYMD = uiState.selectedYMD,
                         occurrences = dayOccurrences,
-                        onOccurrenceClick = { occ -> editingOccurrence = occ },
+                        onOccurrenceClick = { occ -> viewModel.setEditingOccurrence(occ) },
                         modifier = Modifier.weight(1f)
                     )
                 }
                 CalendarViewMode.WEEK -> {
                     WeekScheduleView(
-                        anchorCalendar = selectedCalendar,
-                        selectedYMD = selectedYMD,
-                        allEvents = events,
-                        onSelectDate = { ymd, cal ->
-                            selectedCalendar = cal
-                            selectedYMD = ymd
-                        },
-                        onOccurrenceClick = { occ -> editingOccurrence = occ },
+                        anchorCalendar = uiState.selectedCalendar,
+                        selectedYMD = uiState.selectedYMD,
+                        allEvents = uiState.events,
+                        onSelectDate = { ymd, cal -> viewModel.selectDate(ymd, cal) },
+                        onOccurrenceClick = { occ -> viewModel.setEditingOccurrence(occ) },
                         modifier = Modifier.weight(1f)
                     )
                 }
                 CalendarViewMode.MONTH -> {
                     MonthScheduleView(
-                        anchorCalendar = selectedCalendar,
-                        selectedYMD = selectedYMD,
-                        allEvents = events,
+                        anchorCalendar = uiState.selectedCalendar,
+                        selectedYMD = uiState.selectedYMD,
+                        allEvents = uiState.events,
                         onSelectDate = { ymd, cal ->
-                            selectedCalendar = cal
-                            selectedYMD = ymd
-                            viewMode = CalendarViewMode.DAY
+                            viewModel.selectDate(ymd, cal)
+                            viewModel.setViewMode(CalendarViewMode.DAY)
                         },
                         modifier = Modifier.weight(1f)
                     )
@@ -379,23 +288,27 @@ fun CalendarScreen(
     }
 
     // Dialog Edit / Add Event
-    if (showNewEventDialog) {
+    if (uiState.showNewEventDialog) {
         EventEditDialog(
-            initialDateYMD = selectedYMD,
+            initialDateYMD = uiState.selectedYMD,
             existingEvent = null,
-            occurrenceDate = selectedYMD,
-            onDismiss = { showNewEventDialog = false },
+            occurrenceDate = uiState.selectedYMD,
+            onDismiss = { viewModel.setShowNewEventDialog(false) },
             onSave = { updatedEvent ->
-                val newEvents = events + updatedEvent
-                saveAllEvents(newEvents)
-                showNewEventDialog = false
+                val success = viewModel.addEvent(updatedEvent)
+                if (success) {
+                    Toast.makeText(context, "Đã thêm sự kiện", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "Lỗi thêm sự kiện", Toast.LENGTH_SHORT).show()
+                }
+                viewModel.setShowNewEventDialog(false)
             },
             onDelete = null
         )
     }
 
-    if (editingOccurrence != null) {
-        val occ = editingOccurrence!!
+    if (uiState.editingOccurrence != null) {
+        val occ = uiState.editingOccurrence!!
         var showRecurringChoiceDialog by remember { mutableStateOf(false) }
         var pendingAction by remember { mutableStateOf<((applyToAll: Boolean) -> Unit)?>(null) }
 
@@ -403,69 +316,48 @@ fun CalendarScreen(
             initialDateYMD = occ.occurrenceDate,
             existingEvent = occ.event,
             occurrenceDate = occ.occurrenceDate,
-            onDismiss = { editingOccurrence = null },
+            onDismiss = { viewModel.setEditingOccurrence(null) },
             onSave = { updatedEvent ->
                 if (occ.isRecurring) {
                     pendingAction = { applyToAll ->
-                        val newEvents = events.toMutableList()
-                        if (applyToAll) {
-                            val idx = newEvents.indexOfFirst { it.id == occ.event.id }
-                            if (idx != -1) {
-                                newEvents[idx] = updatedEvent
-                            }
-                        } else {
-                            // Chỉ áp dụng ngày này: thêm exception date vào chuỗi cũ, tạo event mới cho ngày này
-                            val idx = newEvents.indexOfFirst { it.id == occ.event.id }
-                            if (idx != -1) {
-                                val old = newEvents[idx]
-                                val exc = (old.exceptionDates + occ.occurrenceDate).distinct()
-                                newEvents[idx] = old.copy(exceptionDates = exc)
-                            }
-                            newEvents.add(
-                                updatedEvent.copy(
-                                    id = System.currentTimeMillis().toString(),
-                                    repeatDays = emptyList(),
-                                    exceptionDates = emptyList()
-                                )
-                            )
+                        val success = viewModel.updateRecurringEvent(
+                            existingEvent = occ.event,
+                            updatedEvent = updatedEvent,
+                            occurrenceDate = occ.occurrenceDate,
+                            applyToAll = applyToAll
+                        )
+                        if (success) {
+                            Toast.makeText(context, "Đã cập nhật sự kiện", Toast.LENGTH_SHORT).show()
                         }
-                        saveAllEvents(newEvents)
                     }
                     showRecurringChoiceDialog = true
                 } else {
-                    val newEvents = events.toMutableList()
-                    val idx = newEvents.indexOfFirst { it.id == occ.event.id }
-                    if (idx != -1) {
-                        newEvents[idx] = updatedEvent
-                    } else {
-                        newEvents.add(updatedEvent)
+                    val success = viewModel.updateEvent(updatedEvent)
+                    if (success) {
+                        Toast.makeText(context, "Đã cập nhật sự kiện", Toast.LENGTH_SHORT).show()
                     }
-                    saveAllEvents(newEvents)
-                    editingOccurrence = null
+                    viewModel.setEditingOccurrence(null)
                 }
             },
             onDelete = {
                 if (occ.isRecurring) {
                     pendingAction = { applyToAll ->
-                        val newEvents = events.toMutableList()
-                        if (applyToAll) {
-                            newEvents.removeAll { it.id == occ.event.id }
-                        } else {
-                            // Chỉ xóa ngày này (thêm exception date)
-                            val idx = newEvents.indexOfFirst { it.id == occ.event.id }
-                            if (idx != -1) {
-                                val old = newEvents[idx]
-                                val exc = (old.exceptionDates + occ.occurrenceDate).distinct()
-                                newEvents[idx] = old.copy(exceptionDates = exc)
-                            }
+                        val success = viewModel.deleteRecurringEvent(
+                            existingEvent = occ.event,
+                            occurrenceDate = occ.occurrenceDate,
+                            applyToAll = applyToAll
+                        )
+                        if (success) {
+                            Toast.makeText(context, "Đã xóa sự kiện", Toast.LENGTH_SHORT).show()
                         }
-                        saveAllEvents(newEvents)
                     }
                     showRecurringChoiceDialog = true
                 } else {
-                    val newEvents = events.filter { it.id != occ.event.id }
-                    saveAllEvents(newEvents)
-                    editingOccurrence = null
+                    val success = viewModel.deleteEvent(occ.event.id)
+                    if (success) {
+                        Toast.makeText(context, "Đã xóa sự kiện", Toast.LENGTH_SHORT).show()
+                    }
+                    viewModel.setEditingOccurrence(null)
                 }
             }
         )
@@ -483,7 +375,7 @@ fun CalendarScreen(
                         pendingAction?.invoke(true)
                         showRecurringChoiceDialog = false
                         pendingAction = null
-                        editingOccurrence = null
+                        viewModel.setEditingOccurrence(null)
                     }) {
                         Text("Tất cả sự kiện", fontWeight = FontWeight.Bold)
                     }
@@ -493,7 +385,7 @@ fun CalendarScreen(
                         pendingAction?.invoke(false)
                         showRecurringChoiceDialog = false
                         pendingAction = null
-                        editingOccurrence = null
+                        viewModel.setEditingOccurrence(null)
                     }) {
                         Text("Chỉ ngày này")
                     }

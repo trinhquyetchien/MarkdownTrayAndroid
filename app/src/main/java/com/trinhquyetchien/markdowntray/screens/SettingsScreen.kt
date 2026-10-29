@@ -43,6 +43,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,30 +53,40 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trinhquyetchien.markdowntray.data.StorageManager
+import com.trinhquyetchien.markdowntray.viewmodel.AppViewModelFactory
+import com.trinhquyetchien.markdowntray.viewmodel.SettingsViewModel
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     storageManager: StorageManager,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: SettingsViewModel = viewModel(
+        factory = AppViewModelFactory(LocalContext.current, storageManager)
+    )
 ) {
     val context = LocalContext.current
-    var hasPermission by remember { mutableStateOf(storageManager.hasStoragePermission()) }
+    val uiState by viewModel.uiState.collectAsState()
 
-    var dailyDir by remember { mutableStateOf(storageManager.dailyNotesDir) }
-    var dailyAlias by remember { mutableStateOf(storageManager.dailyAlias) }
+    var dailyDir by remember { mutableStateOf(uiState.dailyDir) }
+    var dailyAlias by remember { mutableStateOf(uiState.dailyAlias) }
+    var notesRootDir by remember { mutableStateOf(uiState.notesRootDir) }
+    var deadlineFile by remember { mutableStateOf(uiState.deadlineFile) }
+    var deadlineAlias by remember { mutableStateOf(uiState.deadlineAlias) }
+    var calendarFile by remember { mutableStateOf(uiState.calendarFile) }
 
-    var notesRootDir by remember { mutableStateOf(storageManager.notesRootDir) }
+    var showAddMenuDialog by remember { mutableStateOf(false) }
 
-    var deadlineFile by remember { mutableStateOf(storageManager.deadlineFilePath) }
-    var deadlineAlias by remember { mutableStateOf(storageManager.deadlineAlias) }
-
-    var calendarFile by remember { mutableStateOf(storageManager.calendarFilePath) }
-
-    LaunchedEffect(Unit) {
-        hasPermission = storageManager.hasStoragePermission()
+    LaunchedEffect(uiState) {
+        dailyDir = uiState.dailyDir
+        dailyAlias = uiState.dailyAlias
+        notesRootDir = uiState.notesRootDir
+        deadlineFile = uiState.deadlineFile
+        deadlineAlias = uiState.deadlineAlias
+        calendarFile = uiState.calendarFile
     }
 
     val scrollState = rememberScrollState()
@@ -101,335 +112,234 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Storage Permission Card
+            // Permission Card
             Card(
-                modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (hasPermission) {
-                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-                    } else {
-                        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
-                    }
-                )
+                    containerColor = if (uiState.hasStoragePermission)
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                    else
+                        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
+                ),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (hasPermission) Icons.Default.CheckCircle else Icons.Default.Warning,
-                            contentDescription = null,
-                            tint = if (hasPermission) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (uiState.hasStoragePermission) Icons.Default.CheckCircle else Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = if (uiState.hasStoragePermission) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(end = 12.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (uiState.hasStoragePermission) "Đã cấp quyền truy cập bộ nhớ" else "Chưa cấp quyền bộ nhớ ngoài",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
                         )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = if (hasPermission) "Quyền truy cập bộ nhớ: Đã cấp" else "Cần cấp quyền truy cập bộ nhớ",
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            Text(
-                                text = if (hasPermission) {
-                                    "App có thể đọc và ghi trực tiếp vào thư mục Syncthing theo thời gian thực."
-                                } else {
-                                    "Vui lòng cấp quyền 'All files access' để app có thể chỉnh sửa ghi chú đồng bộ."
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        Text(
+                            text = if (uiState.hasStoragePermission)
+                                "Markdown Tray có toàn quyền đọc/ghi dữ liệu Syncthing."
+                            else
+                                "Cần quyền All Files Access để đồng bộ file ngoài ứng dụng.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
 
-                    if (!hasPermission) {
-                        Spacer(modifier = Modifier.height(12.dp))
+                    if (!uiState.hasStoragePermission) {
+                        Spacer(modifier = Modifier.width(8.dp))
                         Button(
                             onClick = {
                                 try {
                                     context.startActivity(storageManager.getRequestStoragePermissionIntent())
                                 } catch (e: Exception) {
-                                    Toast.makeText(context, "Không thể mở cài đặt: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Không mở được cài đặt quyền", Toast.LENGTH_SHORT).show()
                                 }
-                            },
-                            modifier = Modifier.fillMaxWidth()
+                            }
                         ) {
-                            Icon(Icons.Default.Lock, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Cấp quyền truy cập tất cả tệp")
+                            Text("Cấp quyền")
                         }
                     }
                 }
             }
 
-            // Syncthing Live Diagnostics
+            // Path Configuration Card
             Card(
-                modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                )
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Trạng thái đồng bộ Syncthing",
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleMedium
+                            text = "Đường dẫn thư mục & tệp (Syncthing)",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
                         )
                     }
 
                     Text(
-                        text = "App tích hợp sẵn DirectoryObserver để tự động cập nhật ngay khi Syncthing tải file mới về từ PC.",
+                        text = "Đảm bảo đường dẫn trùng khớp với cấu hình MarkdownTray trên máy tính của bạn.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    val todayInfo = storageManager.getFileSyncInfo(storageManager.getTodayFile())
-                    val deadlineInfo = storageManager.getFileSyncInfo(storageManager.getDeadlineFile())
-                    val calInfo = storageManager.getFileSyncInfo(storageManager.getCalendarFile())
-
-                    Text(
-                        text = "• Hôm nay: ${todayInfo.statusText}",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Text(
-                        text = "• Deadline: ${deadlineInfo.statusText}",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Text(
-                        text = "• Lịch tuần: ${calInfo.statusText}",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-
-            // Notes Root Directory (For 5th Tab "List")
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                )
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.FolderShared, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Thư mục gốc ghi chú (Menu List)",
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
-
-                    OutlinedTextField(
-                        value = notesRootDir,
-                        onValueChange = { notesRootDir = it },
-                        label = { Text("Đường dẫn thư mục ghi chú gốc") },
-                        singleLine = false,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    val exists = File(notesRootDir).isDirectory
-                    Text(
-                        text = if (exists) "✓ Thư mục tồn tại" else "⚠ Chưa có thư mục (sẽ tự tạo khi cần)",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (exists) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
-                    )
-                }
-            }
-
-            // Daily Notes Section
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                )
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Cấu hình Daily Notes",
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
-
-                    OutlinedTextField(
-                        value = dailyAlias,
-                        onValueChange = { dailyAlias = it },
-                        label = { Text("Tên hiển thị (Alias)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
                     )
 
                     OutlinedTextField(
                         value = dailyDir,
                         onValueChange = { dailyDir = it },
                         label = { Text("Thư mục Daily Notes") },
-                        singleLine = false,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
                     )
-
-                    val dirExists = File(dailyDir).isDirectory
-                    Text(
-                        text = if (dirExists) "✓ Thư mục tồn tại" else "⚠ Chưa có thư mục",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (dirExists) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
-                    )
-                }
-            }
-
-            // Deadline Section
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                )
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Cấu hình Deadline",
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
 
                     OutlinedTextField(
-                        value = deadlineAlias,
-                        onValueChange = { deadlineAlias = it },
-                        label = { Text("Tên hiển thị (Alias)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        value = dailyAlias,
+                        onValueChange = { dailyAlias = it },
+                        label = { Text("Tên hiển thị tab Daily") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    OutlinedTextField(
+                        value = notesRootDir,
+                        onValueChange = { notesRootDir = it },
+                        label = { Text("Thư mục gốc ghi chú (Notes Root)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
                     )
 
                     OutlinedTextField(
                         value = deadlineFile,
                         onValueChange = { deadlineFile = it },
-                        label = { Text("Đường dẫn file Deadline (.md)") },
-                        singleLine = false,
-                        modifier = Modifier.fillMaxWidth()
+                        label = { Text("Đường dẫn tệp Deadline") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
                     )
 
-                    val fileExists = File(deadlineFile).isFile
-                    Text(
-                        text = if (fileExists) "✓ File tồn tại" else "⚠ File chưa tồn tại (sẽ tự tạo)",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (fileExists) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                    OutlinedTextField(
+                        value = deadlineAlias,
+                        onValueChange = { deadlineAlias = it },
+                        label = { Text("Tên hiển thị tab Deadline") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
                     )
-                }
-            }
-
-            // Calendar Section
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                )
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Cấu hình Lịch biểu (Calendar)",
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
 
                     OutlinedTextField(
                         value = calendarFile,
                         onValueChange = { calendarFile = it },
-                        label = { Text("Đường dẫn file calendar.json") },
-                        singleLine = false,
-                        modifier = Modifier.fillMaxWidth()
+                        label = { Text("Đường dẫn tệp Calendar (calendar.json)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
                     )
 
-                    val calExists = File(calendarFile).isFile
-                    Text(
-                        text = if (calExists) "✓ File calendar.json tồn tại" else "⚠ File chưa tồn tại",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (calExists) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.resetToDefaults()
+                                Toast.makeText(context, "Đã khôi phục mặc định", Toast.LENGTH_SHORT).show()
+                            }
+                        ) {
+                            Icon(Icons.Default.RestartAlt, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Mặc định")
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Button(
+                            onClick = {
+                                viewModel.savePaths(
+                                    dailyDir = dailyDir,
+                                    dailyAlias = dailyAlias,
+                                    notesRootDir = notesRootDir,
+                                    deadlineFile = deadlineFile,
+                                    deadlineAlias = deadlineAlias,
+                                    calendarFile = calendarFile
+                                )
+                                Toast.makeText(context, "Đã lưu cài đặt", Toast.LENGTH_SHORT).show()
+                            }
+                        ) {
+                            Icon(Icons.Default.Save, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Lưu cấu hình")
+                        }
+                    }
                 }
             }
 
-            // Custom Menus Section
-            var customMenuList by remember { mutableStateOf(storageManager.getCustomMenus()) }
-            var newMenuAlias by remember { mutableStateOf("") }
-            var newMenuPath by remember { mutableStateOf("") }
-            var showAddMenuDialog by remember { mutableStateOf(false) }
-
+            // Custom Menus Management Card
             Card(
-                modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                )
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth()
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Bookmark, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Lối tắt thư mục tùy chỉnh",
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleMedium
+                                text = "Lối tắt Custom Menus",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
                             )
                         }
 
                         IconButton(onClick = { showAddMenuDialog = true }) {
-                            Icon(Icons.Default.Add, contentDescription = "Thêm lối tắt", tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Default.Add, contentDescription = "Thêm Menu")
                         }
                     }
 
-                    if (customMenuList.isEmpty()) {
+                    Text(
+                        text = "Các thư mục được ghim nhanh trên thanh công cụ duyệt ghi chú.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    if (uiState.customMenus.isEmpty()) {
                         Text(
-                            text = "Chưa có thư mục tùy chỉnh nào được thêm.",
+                            text = "Chưa có menu nào được ghim. Bạn có thể ghim nhanh trong tab 'List' hoặc thêm tại đây.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
                     } else {
-                        customMenuList.forEach { menu ->
+                        uiState.customMenus.forEach { menu ->
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
                                 color = MaterialTheme.colorScheme.surface,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(text = menu.name, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                                        Text(
-                                            text = menu.path.replace(StorageManager.DEFAULT_STORAGE_ROOT, "~"),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                                        Text(menu.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                        Text(menu.path, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
-                                    IconButton(onClick = {
-                                        storageManager.removeCustomMenu(menu.path)
-                                        customMenuList = storageManager.getCustomMenus()
-                                    }) {
-                                        Icon(Icons.Default.Close, contentDescription = "Xóa", tint = MaterialTheme.colorScheme.error)
+
+                                    IconButton(
+                                        onClick = {
+                                            viewModel.removeCustomMenu(menu.path)
+                                            Toast.makeText(context, "Đã xóa ${menu.name}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    ) {
+                                        Icon(Icons.Default.Close, contentDescription = "Xóa menu", tint = MaterialTheme.colorScheme.error)
                                     }
                                 }
                             }
@@ -437,108 +347,55 @@ fun SettingsScreen(
                     }
                 }
             }
-
-            if (showAddMenuDialog) {
-                AlertDialog(
-                    onDismissRequest = { showAddMenuDialog = false },
-                    title = { Text("Thêm lối tắt thư mục", fontWeight = FontWeight.Bold) },
-                    text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedTextField(
-                                value = newMenuAlias,
-                                onValueChange = { newMenuAlias = it },
-                                label = { Text("Tên hiển thị (vd: Dự án A)") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OutlinedTextField(
-                                value = newMenuPath,
-                                onValueChange = { newMenuPath = it },
-                                label = { Text("Đường dẫn thư mục") },
-                                placeholder = { Text("${StorageManager.DEFAULT_STORAGE_ROOT}/Note/...") },
-                                singleLine = false,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    },
-                    confirmButton = {
-                        TextButton(
-                            onClick = {
-                                val name = newMenuAlias.trim()
-                                val path = newMenuPath.trim()
-                                if (name.isNotEmpty() && path.isNotEmpty()) {
-                                    storageManager.addCustomMenu(name, path)
-                                    customMenuList = storageManager.getCustomMenus()
-                                    newMenuAlias = ""
-                                    newMenuPath = ""
-                                    showAddMenuDialog = false
-                                }
-                            }
-                        ) {
-                            Text("Thêm", fontWeight = FontWeight.Bold)
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showAddMenuDialog = false }) {
-                            Text("Hủy")
-                        }
-                    }
-                )
-            }
-
-            // Save & Reset Buttons
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedButton(
-                    onClick = {
-                        dailyDir = StorageManager.DEFAULT_DAILY_DIR
-                        dailyAlias = "Daily List"
-                        notesRootDir = StorageManager.DEFAULT_NOTES_ROOT_DIR
-                        deadlineFile = StorageManager.DEFAULT_DEADLINE_FILE
-                        deadlineAlias = "Deadline"
-                        calendarFile = StorageManager.DEFAULT_CALENDAR_FILE
-
-                        storageManager.dailyNotesDir = dailyDir
-                        storageManager.dailyAlias = dailyAlias
-                        storageManager.notesRootDir = notesRootDir
-                        storageManager.deadlineFilePath = deadlineFile
-                        storageManager.deadlineAlias = deadlineAlias
-                        storageManager.calendarFilePath = calendarFile
-
-                        Toast.makeText(context, "Đã khôi phục mặc định", Toast.LENGTH_SHORT).show()
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Default.RestartAlt, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Mặc định")
-                }
-
-                Button(
-                    onClick = {
-                        storageManager.dailyNotesDir = dailyDir.trim()
-                        storageManager.dailyAlias = dailyAlias.trim().ifEmpty { "Daily List" }
-                        storageManager.notesRootDir = notesRootDir.trim().ifEmpty { StorageManager.DEFAULT_NOTES_ROOT_DIR }
-                        storageManager.deadlineFilePath = deadlineFile.trim()
-                        storageManager.deadlineAlias = deadlineAlias.trim().ifEmpty { "Deadline" }
-                        storageManager.calendarFilePath = calendarFile.trim()
-
-                        com.trinhquyetchien.markdowntray.alarm.CalendarAlarmScheduler.scheduleUpcomingAlarms(context, storageManager)
-                        Toast.makeText(context, "Đã lưu cài đặt", Toast.LENGTH_SHORT).show()
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Default.Save, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Lưu")
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
         }
+    }
+
+    // Dialog Add Menu Shortcut
+    if (showAddMenuDialog) {
+        var menuName by remember { mutableStateOf("") }
+        var menuPath by remember { mutableStateOf(uiState.notesRootDir) }
+
+        AlertDialog(
+            onDismissRequest = { showAddMenuDialog = false },
+            title = { Text("Thêm Custom Menu", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = menuName,
+                        onValueChange = { menuName = it },
+                        label = { Text("Tên hiển thị menu") },
+                        placeholder = { Text("Ví dụ: Dự án A") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = menuPath,
+                        onValueChange = { menuPath = it },
+                        label = { Text("Đường dẫn thư mục") },
+                        placeholder = { Text("/storage/emulated/0/Note/DuAnA") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (menuName.isNotBlank() && menuPath.isNotBlank()) {
+                            viewModel.addCustomMenu(menuName.trim(), menuPath.trim())
+                            Toast.makeText(context, "Đã thêm lối tắt", Toast.LENGTH_SHORT).show()
+                            showAddMenuDialog = false
+                        }
+                    }
+                ) {
+                    Text("Thêm", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddMenuDialog = false }) {
+                    Text("Hủy")
+                }
+            }
+        )
     }
 }

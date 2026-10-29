@@ -13,74 +13,40 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trinhquyetchien.markdowntray.data.StorageManager
-import com.trinhquyetchien.markdowntray.data.SyncStatusInfo
-import java.io.File
+import com.trinhquyetchien.markdowntray.viewmodel.AppViewModelFactory
+import com.trinhquyetchien.markdowntray.viewmodel.DeadlineViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DeadlineScreen(
     storageManager: StorageManager,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: DeadlineViewModel = viewModel(
+        factory = AppViewModelFactory(LocalContext.current, storageManager)
+    )
 ) {
     val context = LocalContext.current
-    var rawContent by remember { mutableStateOf("") }
-    var currentFile by remember { mutableStateOf(storageManager.getDeadlineFile()) }
-    var syncInfo by remember { mutableStateOf<SyncStatusInfo?>(null) }
-
-    fun loadContent() {
-        currentFile = storageManager.getDeadlineFile()
-        if (!currentFile.exists() || currentFile.length() == 0L) {
-            currentFile = storageManager.ensureDeadlineFileExists()
-        }
-
-        rawContent = if (currentFile.exists()) {
-            storageManager.readText(currentFile)
-        } else {
-            ""
-        }
-        syncInfo = storageManager.getFileSyncInfo(currentFile)
-    }
-
-    LaunchedEffect(storageManager.deadlineFilePath) {
-        loadContent()
-    }
-
-    // Auto-reload via DirectoryObserver when Syncthing syncs changes to Deadline.md
-    DisposableEffect(storageManager.deadlineFilePath) {
-        val parentDir = currentFile.parentFile ?: File(storageManager.dailyNotesDir)
-        val observer = storageManager.createDirectoryObserver(parentDir) { changedPath ->
-            if (changedPath == null || changedPath == currentFile.name) {
-                loadContent()
-            }
-        }
-        observer.start()
-        onDispose {
-            observer.stop()
-        }
-    }
+    val uiState by viewModel.uiState.collectAsState()
 
     Column(modifier = modifier.fillMaxSize()) {
         TopAppBar(
             title = {
                 Text(
-                    text = storageManager.deadlineAlias,
+                    text = uiState.deadlineAlias,
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleLarge
                 )
             },
             actions = {
                 IconButton(onClick = {
-                    loadContent()
+                    viewModel.loadContent()
                     Toast.makeText(context, "Đã làm mới Deadline", Toast.LENGTH_SHORT).show()
                 }) {
                     Icon(
@@ -96,55 +62,49 @@ fun DeadlineScreen(
         )
 
         MarkdownViewer(
-            title = storageManager.deadlineAlias,
-            rawContent = rawContent,
-            syncInfo = syncInfo,
+            title = uiState.deadlineAlias,
+            rawContent = uiState.rawContent,
+            syncInfo = uiState.syncInfo,
             onToggleTask = { lineIndex, isChecked ->
-                val success = storageManager.toggleTask(currentFile, lineIndex, isChecked)
-                if (success) {
-                    loadContent()
-                } else {
+                val success = viewModel.toggleTask(lineIndex, isChecked)
+                if (!success) {
                     Toast.makeText(context, "Không thể cập nhật task", Toast.LENGTH_SHORT).show()
                 }
             },
             onAddTask = { taskText ->
-                val success = storageManager.appendTask(currentFile, taskText)
+                val success = viewModel.addTask(taskText)
                 if (success) {
-                    loadContent()
-                    Toast.makeText(context, "Đã thêm deadline", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Đã thêm công việc", Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(context, "Lỗi thêm task", Toast.LENGTH_SHORT).show()
                 }
             },
             onSaveRawContent = { newContent ->
-                val success = storageManager.writeText(currentFile, newContent)
+                val success = viewModel.saveRawContent(newContent)
                 if (success) {
-                    loadContent()
-                    Toast.makeText(context, "Đã lưu Deadline", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Đã lưu ghi chú", Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(context, "Lỗi lưu file", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Lỗi lưu ghi chú", Toast.LENGTH_SHORT).show()
                 }
             },
             onRefresh = {
-                loadContent()
+                viewModel.loadContent()
                 Toast.makeText(context, "Đã kiểm tra đồng bộ", Toast.LENGTH_SHORT).show()
             },
             onDeleteTask = { lineIndex ->
-                val success = storageManager.deleteTask(currentFile, lineIndex)
+                val success = viewModel.deleteTask(lineIndex)
                 if (success) {
-                    loadContent()
-                    Toast.makeText(context, "Đã xóa deadline", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Đã xóa nhiệm vụ", Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(context, "Không thể xóa deadline", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Không thể xóa nhiệm vụ", Toast.LENGTH_SHORT).show()
                 }
             },
             onUpdateTaskText = { lineIndex, newText ->
-                val success = storageManager.updateTaskText(currentFile, lineIndex, newText)
+                val success = viewModel.updateTaskText(lineIndex, newText)
                 if (success) {
-                    loadContent()
-                    Toast.makeText(context, "Đã cập nhật deadline", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Đã cập nhật nhiệm vụ", Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(context, "Không thể cập nhật", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Không thể cập nhật nhiệm vụ", Toast.LENGTH_SHORT).show()
                 }
             },
             modifier = Modifier.weight(1f)
