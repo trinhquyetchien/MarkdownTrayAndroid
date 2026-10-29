@@ -8,9 +8,11 @@ Companion Android app for [MarkdownTray](https://github.com/trinhquyetchien/Mark
 
 ## 🚀 Tính năng nổi bật (Features)
 
-- 📅 **Lịch biểu trực quan (Interactive Calendar):**
-  - Tích hợp giao diện lịch tuần/tháng kéo thả mượt mà trên nền tảng WebView.
-  - Tự động đồng bộ hai chiều trực tiếp với tệp `calendar.json`.
+- 📅 **Lịch biểu trực quan 100% Jetpack Compose (Native Interactive Calendar):**
+  - Xây dựng hoàn toàn bằng Compose Native, không sử dụng WebView/HTML, phản hồi siêu mượt mà.
+  - Hỗ trợ xem linh hoạt theo 3 chế độ: Ngày (Day timeline), Tuần (Week view), và Tháng (Month grid).
+  - Thêm, sửa, xóa sự kiện, hỗ trợ chọn màu sắc (color badge), đặt giờ bắt đầu - kết thúc, lặp lại hàng tuần (`repeatDays`), và tùy chọn áp dụng chuỗi định kỳ.
+  - Tự động đồng bộ hai chiều trực tiếp với tệp `calendar.json` tương thích hoàn toàn với bản Linux.
 - 🔔 **Hệ thống nhắc nhở thông minh (Event Alarms & Notifications):**
   - Đặt lịch báo thức chính xác bằng Android `AlarmManager`.
   - Tự động phục hồi và kích hoạt lại lịch nhắc nhở sau khi thiết bị khởi động lại (`BOOT_COMPLETED`).

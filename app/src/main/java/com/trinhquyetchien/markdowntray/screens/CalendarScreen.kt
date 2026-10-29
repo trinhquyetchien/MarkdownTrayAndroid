@@ -1,47 +1,77 @@
 package com.trinhquyetchien.markdowntray.screens
 
-import android.annotation.SuppressLint
-import android.content.Context
-import android.os.Build
-import android.os.Handler
-import android.os.Looper
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
-import android.util.Log
-import android.view.ViewGroup
-import android.webkit.ConsoleMessage
-import android.webkit.JavascriptInterface
-import android.webkit.WebChromeClient
-import android.webkit.WebSettings
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.app.TimePickerDialog
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.CalendarViewDay
+import androidx.compose.material.icons.filled.CalendarViewWeek
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Today
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -51,120 +81,71 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.trinhquyetchien.markdowntray.alarm.CalendarAlarmScheduler
+import com.trinhquyetchien.markdowntray.data.CalendarEvent
+import com.trinhquyetchien.markdowntray.data.CalendarOccurrence
+import com.trinhquyetchien.markdowntray.data.CalendarRepository
+import com.trinhquyetchien.markdowntray.data.CalendarUtils
 import com.trinhquyetchien.markdowntray.data.StorageManager
 import com.trinhquyetchien.markdowntray.data.SyncStatusInfo
 import java.io.File
-import org.json.JSONArray
-import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
-class CalendarWebBridge(
-    private val context: Context,
-    private val storageManager: StorageManager,
-    private val onDataSaved: () -> Unit
-) {
-    private val mainHandler = Handler(Looper.getMainLooper())
-
-    @Suppress("DEPRECATION")
-    @JavascriptInterface
-    fun vibrate(durationMs: Long) {
-        mainHandler.post {
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-                    vibratorManager?.defaultVibrator?.vibrate(
-                        VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE)
-                    )
-                } else {
-                    val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        vibrator?.vibrate(VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE))
-                    } else {
-                        vibrator?.vibrate(durationMs)
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-
-    @JavascriptInterface
-    fun getEventsJson(): String {
-        return try {
-            val file = storageManager.getCalendarFile()
-            if (file.exists()) {
-                val content = file.readText(Charsets.UTF_8).trim()
-                if (content.isNotEmpty()) content else "[]"
-            } else {
-                "[]"
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            "[]"
-        }
-    }
-
-    @JavascriptInterface
-    fun postMessage(message: String) {
-        try {
-            val obj = JSONObject(message)
-            val action = obj.optString("action")
-            if (action == "save_events") {
-                val data = obj.get("data")
-                val formattedJson = when (data) {
-                    is JSONArray -> data.toString(2)
-                    is JSONObject -> data.toString(2)
-                    else -> data.toString()
-                }
-                val file = storageManager.getCalendarFile()
-                storageManager.writeText(file, formattedJson)
-                mainHandler.post {
-                    onDataSaved()
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
+enum class CalendarViewMode {
+    DAY, WEEK, MONTH
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
 @Composable
 fun CalendarScreen(
     storageManager: StorageManager,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+    var events by remember { mutableStateOf<List<CalendarEvent>>(emptyList()) }
     var syncInfo by remember { mutableStateOf<SyncStatusInfo?>(null) }
+    var viewMode by remember { mutableStateOf(CalendarViewMode.DAY) }
 
-    fun buildInjectedHtml(): String {
-        val baseHtml = try {
-            context.assets.open("calendar.html").bufferedReader().use { it.readText() }
-        } catch (e: Exception) {
-            Log.e("CalendarScreen", "Could not load calendar.html from assets", e)
-            ""
-        }
+    val todayCalendar = remember { Calendar.getInstance() }
+    val todayYMD = remember { CalendarUtils.formatYMD(todayCalendar.time) }
+
+    var selectedCalendar by remember { mutableStateOf(Calendar.getInstance()) }
+    var selectedYMD by remember { mutableStateOf(CalendarUtils.formatYMD(selectedCalendar.time)) }
+
+    var editingOccurrence by remember { mutableStateOf<CalendarOccurrence?>(null) }
+    var showNewEventDialog by remember { mutableStateOf(false) }
+
+    fun reloadData() {
         val file = storageManager.getCalendarFile()
-        val json = if (file.exists()) file.readText(Charsets.UTF_8).trim() else "[]"
-        val jsSafeJson = JSONObject.quote(json)
-        val injection = "try { loadData($jsSafeJson); } catch(e){ console.error('Initial loadData error', e); }"
-        return baseHtml.replace("/* __INITIAL_EVENTS_DATA__ */", injection)
+        events = CalendarRepository.loadEvents(file)
+        syncInfo = storageManager.getFileSyncInfo(file)
+        CalendarAlarmScheduler.scheduleUpcomingAlarms(context, storageManager)
     }
 
-    fun refreshCalendar() {
+    fun saveAllEvents(newEvents: List<CalendarEvent>) {
         val file = storageManager.getCalendarFile()
-        syncInfo = storageManager.getFileSyncInfo(file)
-        val json = if (file.exists()) file.readText(Charsets.UTF_8).trim() else "[]"
-        val jsSafeJson = JSONObject.quote(json)
-        webViewRef?.evaluateJavascript("if (typeof loadData === 'function') { loadData($jsSafeJson); }", null)
+        events = newEvents
+        val success = CalendarRepository.saveEvents(file, newEvents)
+        if (success) {
+            syncInfo = storageManager.getFileSyncInfo(file)
+            CalendarAlarmScheduler.scheduleUpcomingAlarms(context, storageManager)
+            Toast.makeText(context, "Đã lưu lịch biểu", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, "Lỗi khi lưu lịch biểu", Toast.LENGTH_SHORT).show()
+        }
     }
 
     LaunchedEffect(storageManager.calendarFilePath) {
-        syncInfo = storageManager.getFileSyncInfo(storageManager.getCalendarFile())
+        reloadData()
     }
 
     // Auto-reload via DirectoryObserver when Syncthing writes calendar.json
@@ -173,7 +154,7 @@ fun CalendarScreen(
         val parentDir = file.parentFile ?: File(StorageManager.DEFAULT_STORAGE_ROOT)
         val observer = storageManager.createDirectoryObserver(parentDir) { changedPath ->
             if (changedPath == null || changedPath == file.name) {
-                refreshCalendar()
+                reloadData()
             }
         }
         observer.start()
@@ -182,120 +163,987 @@ fun CalendarScreen(
         }
     }
 
-    val bridge: CalendarWebBridge = remember {
-        CalendarWebBridge(context, storageManager) {
-            syncInfo = storageManager.getFileSyncInfo(storageManager.getCalendarFile())
-            com.trinhquyetchien.markdowntray.alarm.CalendarAlarmScheduler.scheduleUpcomingAlarms(context, storageManager)
-            Toast.makeText(context, "Đã lưu lịch biểu", Toast.LENGTH_SHORT).show()
+    val dayOccurrences = remember(events, selectedYMD) {
+        CalendarUtils.getOccurrencesForDate(events, selectedYMD)
+    }
+
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Lịch biểu",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                        }
+
+                        // Sync Status pill
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    reloadData()
+                                    Toast.makeText(context, "Đã kiểm tra đồng bộ", Toast.LENGTH_SHORT).show()
+                                }
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (syncInfo?.isSynced == true) Color(0xFF4CAF50)
+                                        else Color(0xFFFF9800)
+                                    )
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = syncInfo?.statusText ?: "Đang kiểm tra...",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                },
+                actions = {
+                    IconButton(onClick = {
+                        reloadData()
+                        Toast.makeText(context, "Đã làm mới lịch", Toast.LENGTH_SHORT).show()
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Làm mới",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { showNewEventDialog = true },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Thêm sự kiện")
+            }
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            // Header Controls: View mode switcher (Day, Week, Month)
+            Surface(
+                tonalElevation = 2.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Navigation prev/today/next
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = {
+                                val cal = selectedCalendar.clone() as Calendar
+                                when (viewMode) {
+                                    CalendarViewMode.DAY -> cal.add(Calendar.DAY_OF_YEAR, -1)
+                                    CalendarViewMode.WEEK -> cal.add(Calendar.WEEK_OF_YEAR, -1)
+                                    CalendarViewMode.MONTH -> cal.add(Calendar.MONTH, -1)
+                                }
+                                selectedCalendar = cal
+                                selectedYMD = CalendarUtils.formatYMD(cal.time)
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Trước", modifier = Modifier.size(20.dp))
+                        }
+
+                        TextButton(onClick = {
+                            selectedCalendar = Calendar.getInstance()
+                            selectedYMD = CalendarUtils.formatYMD(selectedCalendar.time)
+                        }) {
+                            Text(
+                                text = if (selectedYMD == todayYMD) "Hôm nay" else "Về hôm nay",
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        IconButton(
+                            onClick = {
+                                val cal = selectedCalendar.clone() as Calendar
+                                when (viewMode) {
+                                    CalendarViewMode.DAY -> cal.add(Calendar.DAY_OF_YEAR, 1)
+                                    CalendarViewMode.WEEK -> cal.add(Calendar.WEEK_OF_YEAR, 1)
+                                    CalendarViewMode.MONTH -> cal.add(Calendar.MONTH, 1)
+                                }
+                                selectedCalendar = cal
+                                selectedYMD = CalendarUtils.formatYMD(cal.time)
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Sau", modifier = Modifier.size(20.dp))
+                        }
+                    }
+
+                    // Mode switch tabs
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            .padding(2.dp)
+                    ) {
+                        ViewModeButton(
+                            label = "Ngày",
+                            selected = viewMode == CalendarViewMode.DAY,
+                            onClick = { viewMode = CalendarViewMode.DAY }
+                        )
+                        ViewModeButton(
+                            label = "Tuần",
+                            selected = viewMode == CalendarViewMode.WEEK,
+                            onClick = { viewMode = CalendarViewMode.WEEK }
+                        )
+                        ViewModeButton(
+                            label = "Tháng",
+                            selected = viewMode == CalendarViewMode.MONTH,
+                            onClick = { viewMode = CalendarViewMode.MONTH }
+                        )
+                    }
+                }
+            }
+
+            // Current date title banner
+            val headerTitle = when (viewMode) {
+                CalendarViewMode.DAY -> SimpleDateFormat("EEEE, dd MMMM yyyy", Locale.forLanguageTag("vi-VN")).format(selectedCalendar.time)
+                CalendarViewMode.WEEK -> "Tuần ${selectedCalendar.get(Calendar.WEEK_OF_YEAR)} - Tháng ${selectedCalendar.get(Calendar.MONTH) + 1}/${selectedCalendar.get(Calendar.YEAR)}"
+                CalendarViewMode.MONTH -> SimpleDateFormat("MMMM yyyy", Locale.forLanguageTag("vi-VN")).format(selectedCalendar.time)
+            }
+            Text(
+                text = headerTitle.replaceFirstChar { it.uppercase() },
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+
+            // Content body according to view mode
+            when (viewMode) {
+                CalendarViewMode.DAY -> {
+                    DayScheduleView(
+                        selectedDateYMD = selectedYMD,
+                        occurrences = dayOccurrences,
+                        onOccurrenceClick = { occ -> editingOccurrence = occ },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                CalendarViewMode.WEEK -> {
+                    WeekScheduleView(
+                        anchorCalendar = selectedCalendar,
+                        selectedYMD = selectedYMD,
+                        allEvents = events,
+                        onSelectDate = { ymd, cal ->
+                            selectedCalendar = cal
+                            selectedYMD = ymd
+                        },
+                        onOccurrenceClick = { occ -> editingOccurrence = occ },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                CalendarViewMode.MONTH -> {
+                    MonthScheduleView(
+                        anchorCalendar = selectedCalendar,
+                        selectedYMD = selectedYMD,
+                        allEvents = events,
+                        onSelectDate = { ymd, cal ->
+                            selectedCalendar = cal
+                            selectedYMD = ymd
+                            viewMode = CalendarViewMode.DAY
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
         }
     }
 
-    Column(modifier = modifier.fillMaxSize()) {
-        TopAppBar(
-            title = {
-                Column {
-                    Text(
-                        text = "Lịch biểu",
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleLarge
-                    )
+    // Dialog Edit / Add Event
+    if (showNewEventDialog) {
+        EventEditDialog(
+            initialDateYMD = selectedYMD,
+            existingEvent = null,
+            occurrenceDate = selectedYMD,
+            onDismiss = { showNewEventDialog = false },
+            onSave = { updatedEvent ->
+                val newEvents = events + updatedEvent
+                saveAllEvents(newEvents)
+                showNewEventDialog = false
+            },
+            onDelete = null
+        )
+    }
 
-                    // Sync Status pill
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { refreshCalendar() }
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(7.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (syncInfo?.isSynced == true) Color(0xFF4CAF50)
-                                    else Color(0xFFFF9800)
+    if (editingOccurrence != null) {
+        val occ = editingOccurrence!!
+        var showRecurringChoiceDialog by remember { mutableStateOf(false) }
+        var pendingAction by remember { mutableStateOf<((applyToAll: Boolean) -> Unit)?>(null) }
+
+        EventEditDialog(
+            initialDateYMD = occ.occurrenceDate,
+            existingEvent = occ.event,
+            occurrenceDate = occ.occurrenceDate,
+            onDismiss = { editingOccurrence = null },
+            onSave = { updatedEvent ->
+                if (occ.isRecurring) {
+                    pendingAction = { applyToAll ->
+                        val newEvents = events.toMutableList()
+                        if (applyToAll) {
+                            val idx = newEvents.indexOfFirst { it.id == occ.event.id }
+                            if (idx != -1) {
+                                newEvents[idx] = updatedEvent
+                            }
+                        } else {
+                            // Chỉ áp dụng ngày này: thêm exception date vào chuỗi cũ, tạo event mới cho ngày này
+                            val idx = newEvents.indexOfFirst { it.id == occ.event.id }
+                            if (idx != -1) {
+                                val old = newEvents[idx]
+                                val exc = (old.exceptionDates + occ.occurrenceDate).distinct()
+                                newEvents[idx] = old.copy(exceptionDates = exc)
+                            }
+                            newEvents.add(
+                                updatedEvent.copy(
+                                    id = System.currentTimeMillis().toString(),
+                                    repeatDays = emptyList(),
+                                    exceptionDates = emptyList()
                                 )
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = syncInfo?.statusText ?: "Đang kiểm tra...",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                            )
+                        }
+                        saveAllEvents(newEvents)
                     }
+                    showRecurringChoiceDialog = true
+                } else {
+                    val newEvents = events.toMutableList()
+                    val idx = newEvents.indexOfFirst { it.id == occ.event.id }
+                    if (idx != -1) {
+                        newEvents[idx] = updatedEvent
+                    } else {
+                        newEvents.add(updatedEvent)
+                    }
+                    saveAllEvents(newEvents)
+                    editingOccurrence = null
                 }
             },
-            actions = {
-                IconButton(onClick = {
-                    refreshCalendar()
-                    Toast.makeText(context, "Đã làm mới lịch", Toast.LENGTH_SHORT).show()
-                }) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Làm mới",
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
+            onDelete = {
+                if (occ.isRecurring) {
+                    pendingAction = { applyToAll ->
+                        val newEvents = events.toMutableList()
+                        if (applyToAll) {
+                            newEvents.removeAll { it.id == occ.event.id }
+                        } else {
+                            // Chỉ xóa ngày này (thêm exception date)
+                            val idx = newEvents.indexOfFirst { it.id == occ.event.id }
+                            if (idx != -1) {
+                                val old = newEvents[idx]
+                                val exc = (old.exceptionDates + occ.occurrenceDate).distinct()
+                                newEvents[idx] = old.copy(exceptionDates = exc)
+                            }
+                        }
+                        saveAllEvents(newEvents)
+                    }
+                    showRecurringChoiceDialog = true
+                } else {
+                    val newEvents = events.filter { it.id != occ.event.id }
+                    saveAllEvents(newEvents)
+                    editingOccurrence = null
                 }
-            },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
+            }
         )
 
-        Box(modifier = Modifier.fillMaxSize()) {
-            AndroidView(
-                factory = { ctx ->
-                    WebView(ctx).apply {
-                        layoutParams = ViewGroup.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT
-                        )
-                        setBackgroundColor(android.graphics.Color.parseColor("#1c1c1e"))
-
-                        isHapticFeedbackEnabled = true
-                        settings.javaScriptEnabled = true
-                        settings.domStorageEnabled = true
-                        settings.allowFileAccess = true
-                        settings.allowContentAccess = true
-                        @Suppress("DEPRECATION")
-                        settings.allowFileAccessFromFileURLs = true
-                        @Suppress("DEPRECATION")
-                        settings.allowUniversalAccessFromFileURLs = true
-                        settings.useWideViewPort = true
-                        settings.loadWithOverviewMode = true
-                        settings.builtInZoomControls = true
-                        settings.displayZoomControls = false
-                        settings.cacheMode = WebSettings.LOAD_NO_CACHE
-
-                        webChromeClient = object : WebChromeClient() {
-                            override fun onConsoleMessage(cm: ConsoleMessage?): Boolean {
-                                Log.d("CalendarWebView", "${cm?.message()} -- line ${cm?.lineNumber()}")
-                                return super.onConsoleMessage(cm)
-                            }
-                        }
-
-                        webViewClient = object : WebViewClient() {
-                            override fun onPageFinished(view: WebView?, url: String?) {
-                                super.onPageFinished(view, url)
-                                val file = storageManager.getCalendarFile()
-                                syncInfo = storageManager.getFileSyncInfo(file)
-                                val json = if (file.exists()) file.readText(Charsets.UTF_8).trim() else "[]"
-                                val jsSafeJson = JSONObject.quote(json)
-                                view?.evaluateJavascript("if (typeof loadData === 'function') { loadData($jsSafeJson); }", null)
-                            }
-                        }
-
-                        addJavascriptInterface(bridge, "AndroidBridge")
-                        val injectedHtml = buildInjectedHtml()
-                        loadDataWithBaseURL("file:///android_asset/", injectedHtml, "text/html", "UTF-8", null)
-                        webViewRef = this
+        if (showRecurringChoiceDialog && pendingAction != null) {
+            AlertDialog(
+                onDismissRequest = {
+                    showRecurringChoiceDialog = false
+                    pendingAction = null
+                },
+                title = { Text("Lặp lại sự kiện", fontWeight = FontWeight.Bold) },
+                text = { Text("Bạn muốn áp dụng thay đổi này chỉ cho ngày này hay toàn bộ chuỗi sự kiện?") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        pendingAction?.invoke(true)
+                        showRecurringChoiceDialog = false
+                        pendingAction = null
+                        editingOccurrence = null
+                    }) {
+                        Text("Tất cả sự kiện", fontWeight = FontWeight.Bold)
                     }
                 },
-                update = { webView ->
-                    webViewRef = webView
-                },
-                modifier = Modifier.fillMaxSize()
+                dismissButton = {
+                    TextButton(onClick = {
+                        pendingAction?.invoke(false)
+                        showRecurringChoiceDialog = false
+                        pendingAction = null
+                        editingOccurrence = null
+                    }) {
+                        Text("Chỉ ngày này")
+                    }
+                }
             )
+        }
+    }
+}
+
+@Composable
+private fun ViewModeButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+        modifier = Modifier.clickable { onClick() }
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+// -------------------------------------------------------------
+// Day View: Timeline 24h
+// -------------------------------------------------------------
+@Composable
+private fun DayScheduleView(
+    selectedDateYMD: String,
+    occurrences: List<CalendarOccurrence>,
+    onOccurrenceClick: (CalendarOccurrence) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (occurrences.isEmpty()) {
+        Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = Icons.Default.Event,
+                    contentDescription = null,
+                    modifier = Modifier.size(54.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Không có lịch hẹn nào trong ngày",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Bấm dấu + góc dưới để tạo sự kiện mới",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
+        }
+    } else {
+        LazyColumn(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            items(occurrences, key = { "${it.event.id}_${it.startHour}_${it.startMinute}" }) { occ ->
+                EventCard(
+                    occurrence = occ,
+                    onClick = { onOccurrenceClick(occ) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EventCard(
+    occurrence: CalendarOccurrence,
+    onClick: () -> Unit
+) {
+    val ev = occurrence.event
+    val eventColor = try {
+        Color(android.graphics.Color.parseColor(ev.color))
+    } catch (e: Exception) {
+        MaterialTheme.colorScheme.primary
+    }
+
+    val timeRangeStr = String.format(
+        Locale.US,
+        "%02d:%02d - %02d:%02d",
+        occurrence.startHour,
+        occurrence.startMinute,
+        occurrence.endHour,
+        occurrence.endMinute
+    )
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = eventColor.copy(alpha = 0.12f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Color accent bar
+            Box(
+                modifier = Modifier
+                    .width(5.dp)
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(eventColor)
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = ev.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    if (occurrence.isRecurring) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.Repeat,
+                            contentDescription = "Lặp lại",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.AccessTime,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = timeRangeStr,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                if (ev.note.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = ev.note,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------
+// Week View
+// -------------------------------------------------------------
+@Composable
+private fun WeekScheduleView(
+    anchorCalendar: Calendar,
+    selectedYMD: String,
+    allEvents: List<CalendarEvent>,
+    onSelectDate: (String, Calendar) -> Unit,
+    onOccurrenceClick: (CalendarOccurrence) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val weekDates = remember(anchorCalendar) {
+        CalendarUtils.getWeekDates(anchorCalendar)
+    }
+
+    val dayNames = listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN")
+
+    Column(modifier = modifier.fillMaxSize()) {
+        // Week days header strip
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceAround
+        ) {
+            weekDates.forEachIndexed { idx, date ->
+                val dateCal = Calendar.getInstance().apply { time = date }
+                val ymd = CalendarUtils.formatYMD(date)
+                val isSelected = ymd == selectedYMD
+                val isToday = ymd == CalendarUtils.formatYMD(Date())
+
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (isSelected) MaterialTheme.colorScheme.primary
+                            else if (isToday) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                            else Color.Transparent
+                        )
+                        .clickable { onSelectDate(ymd, dateCal) }
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = dayNames[idx],
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = SimpleDateFormat("dd", Locale.getDefault()).format(date),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                    )
+
+                    // Event indicator dot
+                    val dayOccs = CalendarUtils.getOccurrencesForDate(allEvents, ymd)
+                    if (dayOccs.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(4.dp)
+                                .clip(CircleShape)
+                                .background(if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary)
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+            }
+        }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+        // Schedule of the selected date in week
+        val currentDayOccurrences = remember(allEvents, selectedYMD) {
+            CalendarUtils.getOccurrencesForDate(allEvents, selectedYMD)
+        }
+
+        DayScheduleView(
+            selectedDateYMD = selectedYMD,
+            occurrences = currentDayOccurrences,
+            onOccurrenceClick = onOccurrenceClick,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+// -------------------------------------------------------------
+// Month View
+// -------------------------------------------------------------
+@Composable
+private fun MonthScheduleView(
+    anchorCalendar: Calendar,
+    selectedYMD: String,
+    allEvents: List<CalendarEvent>,
+    onSelectDate: (String, Calendar) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val monthGridDates = remember(anchorCalendar) {
+        CalendarUtils.getMonthGridDates(anchorCalendar)
+    }
+
+    val currentMonth = anchorCalendar.get(Calendar.MONTH)
+    val dayNames = listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN")
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 8.dp)
+    ) {
+        // Day names header
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceAround
+        ) {
+            dayNames.forEach { name ->
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(42.dp),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+
+        HorizontalDivider()
+
+        // 6 rows x 7 columns grid
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceEvenly
+        ) {
+            for (week in 0 until 6) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceAround
+                ) {
+                    for (day in 0 until 7) {
+                        val index = week * 7 + day
+                        val date = monthGridDates[index]
+                        val cal = Calendar.getInstance().apply { time = date }
+                        val ymd = CalendarUtils.formatYMD(date)
+                        val isThisMonth = cal.get(Calendar.MONTH) == currentMonth
+                        val isSelected = ymd == selectedYMD
+                        val isToday = ymd == CalendarUtils.formatYMD(Date())
+                        val dayOccs = CalendarUtils.getOccurrencesForDate(allEvents, ymd)
+
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primary
+                                    else if (isToday) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                    else Color.Transparent
+                                )
+                                .clickable { onSelectDate(ymd, cal) }
+                                .padding(4.dp)
+                        ) {
+                            Text(
+                                text = SimpleDateFormat("d", Locale.getDefault()).format(date),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                else if (isThisMonth) MaterialTheme.colorScheme.onSurface
+                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+                            )
+
+                            if (dayOccs.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    dayOccs.take(3).forEach { occ ->
+                                        val color = try {
+                                            Color(android.graphics.Color.parseColor(occ.event.color))
+                                        } catch (e: Exception) {
+                                            MaterialTheme.colorScheme.primary
+                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .size(4.dp)
+                                                .clip(CircleShape)
+                                                .background(if (isSelected) MaterialTheme.colorScheme.onPrimary else color)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------
+// Dialog: Thêm / Sửa Sự kiện
+// -------------------------------------------------------------
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun EventEditDialog(
+    initialDateYMD: String,
+    existingEvent: CalendarEvent?,
+    occurrenceDate: String,
+    onDismiss: () -> Unit,
+    onSave: (CalendarEvent) -> Unit,
+    onDelete: (() -> Unit)?
+) {
+    val context = LocalContext.current
+
+    var title by remember { mutableStateOf(existingEvent?.title ?: "") }
+    var note by remember { mutableStateOf(existingEvent?.note ?: "") }
+    var selectedColor by remember { mutableStateOf(existingEvent?.color ?: "#0a84ff") }
+
+    var dateStr by remember { mutableStateOf(occurrenceDate) }
+
+    val initialStart = if (existingEvent != null && existingEvent.start.length >= 16) {
+        existingEvent.start.substring(11, 16)
+    } else "09:00"
+
+    val initialEnd = if (existingEvent != null && existingEvent.end.length >= 16) {
+        existingEvent.end.substring(11, 16)
+    } else "10:00"
+
+    var startTime by remember { mutableStateOf(initialStart) }
+    var endTime by remember { mutableStateOf(initialEnd) }
+
+    val repeatDays = remember {
+        mutableStateListOf<Int>().apply {
+            existingEvent?.repeatDays?.let { addAll(it) }
+        }
+    }
+
+    val colorOptions = listOf(
+        "#0a84ff", // Xanh dương
+        "#30d158", // Xanh lá
+        "#ff9f0a", // Cam
+        "#ff453a", // Đỏ
+        "#bf5af2", // Tím
+        "#64d2ff", // Lam nhạt
+        "#ffd60a", // Vàng
+        "#8e8e93"  // Xám
+    )
+
+    val weekDays = listOf(
+        Pair(1, "T2"),
+        Pair(2, "T3"),
+        Pair(3, "T4"),
+        Pair(4, "T5"),
+        Pair(5, "T6"),
+        Pair(6, "T7"),
+        Pair(0, "CN")
+    )
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .clip(RoundedCornerShape(24.dp)),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (existingEvent == null) "Thêm sự kiện" else "Sửa sự kiện",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Đóng")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Title Input
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Tiêu đề") },
+                    placeholder = { Text("Bạn định làm gì?") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Note Input
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    label = { Text("Ghi chú / Mô tả") },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 3,
+                    shape = RoundedCornerShape(14.dp)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Time Pickers (Start - End)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Start Time Button
+                    OutlinedButton(
+                        onClick = {
+                            val (h, m) = CalendarUtils.parseTime(startTime)
+                            TimePickerDialog(context, { _, hour, minute ->
+                                startTime = String.format(Locale.US, "%02d:%02d", hour, minute)
+                            }, h, m, true).show()
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Bắt đầu", style = MaterialTheme.typography.labelSmall)
+                            Text(startTime, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    // End Time Button
+                    OutlinedButton(
+                        onClick = {
+                            val (h, m) = CalendarUtils.parseTime(endTime)
+                            TimePickerDialog(context, { _, hour, minute ->
+                                endTime = String.format(Locale.US, "%02d:%02d", hour, minute)
+                            }, h, m, true).show()
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Kết thúc", style = MaterialTheme.typography.labelSmall)
+                            Text(endTime, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Color picker
+                Text("Màu sắc sự kiện", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    colorOptions.forEach { hex ->
+                        val color = Color(android.graphics.Color.parseColor(hex))
+                        val isSelected = selectedColor.equals(hex, ignoreCase = true)
+
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(color)
+                                .clickable { selectedColor = hex }
+                                .then(
+                                    if (isSelected) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                    else Modifier
+                                )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Repeat Days Selector
+                Text("Lặp lại hàng tuần", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    weekDays.forEach { (dayInt, dayLabel) ->
+                        val isChecked = repeatDays.contains(dayInt)
+                        Surface(
+                            shape = CircleShape,
+                            color = if (isChecked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clickable {
+                                    if (isChecked) repeatDays.remove(dayInt)
+                                    else repeatDays.add(dayInt)
+                                }
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = dayLabel,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isChecked) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Actions: Save & Delete
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (onDelete != null) {
+                        IconButton(onClick = onDelete) {
+                            Icon(Icons.Default.Delete, contentDescription = "Xóa sự kiện", tint = MaterialTheme.colorScheme.error)
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+
+                    TextButton(onClick = onDismiss) {
+                        Text("Hủy")
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Button(
+                        onClick = {
+                            val cleanTitle = title.trim().ifEmpty { "Không tiêu đề" }
+                            val startDateTime = "${dateStr}T${startTime}:00"
+                            val endDateTime = "${dateStr}T${endTime}:00"
+
+                            val event = CalendarEvent(
+                                id = existingEvent?.id ?: System.currentTimeMillis().toString(),
+                                title = cleanTitle,
+                                note = note.trim(),
+                                color = selectedColor,
+                                start = startDateTime,
+                                end = endDateTime,
+                                repeatDays = repeatDays.toList(),
+                                exceptionDates = existingEvent?.exceptionDates ?: emptyList(),
+                                untilDate = existingEvent?.untilDate
+                            )
+                            onSave(event)
+                        },
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text("Lưu", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
         }
     }
 }
