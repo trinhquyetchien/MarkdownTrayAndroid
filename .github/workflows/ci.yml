@@ -1,10 +1,10 @@
-name: Android CI
+name: Android CI / CD
 
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 concurrency:
@@ -12,13 +12,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build & Test
+  build-and-release:
+    name: Build APK & Release
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -36,9 +41,44 @@ jobs:
       - name: Build Debug APK
         run: ./gradlew assembleDebug
 
-      - name: Upload Debug APK
+      - name: Prepare APK artifact name
+        id: prep
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          TIMESTAMP=$(date +'%Y%m%d_%H%M%S')
+          APK_NAME="MarkdownTray-${SHORT_SHA}.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "${APK_NAME}"
+          echo "apk_name=${APK_NAME}" >> $GITHUB_OUTPUT
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "timestamp=${TIMESTAMP}" >> $GITHUB_OUTPUT
+
+      - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: markdowntray-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 14
+          name: ${{ steps.prep.outputs.apk_name }}
+          path: ${{ steps.prep.outputs.apk_name }}
+          retention-days: 30
+
+      - name: Create or Update Rolling GitHub Pre-Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: "nightly"
+          name: "MarkdownTray Nightly Build (${{ steps.prep.outputs.short_sha }})"
+          body: |
+            ### 🚀 MarkdownTray Android Nightly Build
+            - **Commit**: [${{ steps.prep.outputs.short_sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
+            - **Build Time**: ${{ steps.prep.outputs.timestamp }}
+            - **Tính năng nổi bật**:
+              - 100% Native Jetpack Compose (không còn WebView / HTML).
+              - Kiến trúc MVVM hoàn chỉnh kết hợp StateFlow.
+              - Theme Emerald Green hiện đại, icon Outlined thanh lịch.
+              - Font chữ tiếng Việt Be Vietnam Pro sắc nét.
+              - Tự động đồng bộ file `calendar.json` và Markdown với Syncthing.
+            
+            Tải ngay tệp APK đính kèm bên dưới để cài đặt trên thiết bị Android:
+          files: |
+            ${{ steps.prep.outputs.apk_name }}
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
