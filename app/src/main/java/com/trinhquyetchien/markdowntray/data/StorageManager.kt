@@ -87,11 +87,11 @@ class StorageManager(private val context: Context) {
         private const val KEY_CUSTOM_MENUS_JSON = "key_custom_menus_json"
 
         val DEFAULT_STORAGE_ROOT: String = Environment.getExternalStorageDirectory().absolutePath
-        val DEFAULT_DAILY_DIR: String = "$DEFAULT_STORAGE_ROOT/Note/Daily"
-        val DEFAULT_NOTES_ROOT_DIR: String = "$DEFAULT_STORAGE_ROOT/Note"
-        val DEFAULT_DEADLINE_FILE: String = "$DEFAULT_STORAGE_ROOT/Note/Deadline/Deadline.md"
+        val DEFAULT_NOTES_ROOT_DIR: String = "$DEFAULT_STORAGE_ROOT/Documents"
+        val DEFAULT_DAILY_DIR: String = "$DEFAULT_STORAGE_ROOT/Documents/Daily"
+        val DEFAULT_DEADLINE_FILE: String = "$DEFAULT_STORAGE_ROOT/Documents/Deadline/Deadline.md"
         val LEGACY_DEADLINE_FILE: String = "$DEFAULT_STORAGE_ROOT/Note/Daily/Deadline.md"
-        val DEFAULT_CALENDAR_FILE: String = "$DEFAULT_STORAGE_ROOT/Note/calendar.json"
+        val DEFAULT_CALENDAR_FILE: String = "$DEFAULT_STORAGE_ROOT/Documents/calendar.json"
     }
 
     var dailyNotesDir: String

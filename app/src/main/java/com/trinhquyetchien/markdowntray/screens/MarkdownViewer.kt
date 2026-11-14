@@ -25,16 +25,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.DriveFileRenameOutline
-import androidx.compose.material.icons.outlined.EditNote
-import androidx.compose.material.icons.outlined.Inbox
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Save
-import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Inbox
+import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -113,89 +110,56 @@ fun MarkdownViewer(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 6.dp),
-            shape = RoundedCornerShape(18.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                // Top status row: Sync indicator & actions
+            Column(modifier = Modifier.padding(14.dp)) {
+                // Header row: Title and Edit action
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { onRefresh() }
-                            .padding(vertical = 4.dp, horizontal = 4.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(7.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (syncInfo?.isSynced == true) StatusGreen
-                                    else StatusOrange
-                                )
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = syncInfo?.statusText ?: "Đang đồng bộ...",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f)
+                    )
 
-                    Row {
-                        IconButton(
-                            onClick = onRefresh,
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Refresh,
-                                contentDescription = "Làm mới",
-                                modifier = Modifier.size(18.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (totalCount > 0) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(end = 6.dp)
+                            ) {
+                                Text(
+                                    text = "$completedCount/$totalCount",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
                         }
 
                         IconButton(
                             onClick = { showEditDialog = true },
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surface)
                         ) {
                             Icon(
-                                imageVector = Icons.Outlined.EditNote,
+                                imageVector = Icons.Rounded.Edit,
                                 contentDescription = "Sửa markdown",
-                                modifier = Modifier.size(20.dp),
+                                modifier = Modifier.size(16.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                // Title & Progress percentage
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    if (totalCount > 0) {
-                        Text(
-                            text = "${(progress * 100).toInt()}%",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
                     }
                 }
 
@@ -208,43 +172,9 @@ fun MarkdownViewer(
                             .height(6.dp)
                             .clip(RoundedCornerShape(3.dp)),
                         color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.outlineVariant,
+                        trackColor = MaterialTheme.colorScheme.surface,
                         strokeCap = StrokeCap.Round
                     )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Minimal clean stats line
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "$completedCount hoàn thành",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "•",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                        )
-                        Text(
-                            text = "$pendingCount đang chờ",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "•",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                        )
-                        Text(
-                            text = "Tổng số $totalCount việc",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
                 }
             }
         }
@@ -267,7 +197,7 @@ fun MarkdownViewer(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(
-                                imageVector = Icons.Outlined.Inbox,
+                                imageVector = Icons.Rounded.Inbox,
                                 contentDescription = null,
                                 modifier = Modifier.size(44.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
@@ -327,14 +257,17 @@ fun MarkdownViewer(
 
         // Docked Quick-Add Task Bar
         Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.surface,
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -343,14 +276,14 @@ fun MarkdownViewer(
                     onValueChange = { newTaskText = it },
                     placeholder = {
                         Text(
-                            text = "Thêm nhiệm vụ mới...",
+                            text = "Nhiệm vụ mới...",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
                     },
                     modifier = Modifier.weight(1f),
                     singleLine = true,
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(20.dp),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = {
                         if (newTaskText.isNotBlank()) {
@@ -359,8 +292,8 @@ fun MarkdownViewer(
                         }
                     }),
                     colors = TextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                         focusedIndicatorColor = MaterialTheme.colorScheme.primary,
                         unfocusedIndicatorColor = Color.Transparent
                     )
@@ -379,7 +312,7 @@ fun MarkdownViewer(
                         .background(MaterialTheme.colorScheme.primary)
                 ) {
                     Icon(
-                        imageVector = Icons.Outlined.Add,
+                        imageVector = Icons.Rounded.Add,
                         contentDescription = "Thêm task",
                         tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(20.dp)
@@ -423,22 +356,22 @@ private fun TaskCardItem(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = (task.indentLevel * 14).dp)
-            .clip(RoundedCornerShape(12.dp))
+            .padding(start = (task.indentLevel * 12).dp)
+            .clip(RoundedCornerShape(14.dp))
             .clickable { onCheckedChange(!task.isChecked) },
-        shape = RoundedCornerShape(12.dp),
-        color = if (task.isChecked) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-        else MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(14.dp),
+        color = if (task.isChecked) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            if (task.isChecked) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-            else MaterialTheme.colorScheme.outlineVariant
+            if (task.isChecked) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)
+            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
         )
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
+                .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Checkbox(
@@ -446,7 +379,7 @@ private fun TaskCardItem(
                 onCheckedChange = onCheckedChange,
                 colors = CheckboxDefaults.colors(
                     checkedColor = MaterialTheme.colorScheme.primary,
-                    uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                 )
             )
 
@@ -456,7 +389,7 @@ private fun TaskCardItem(
                     style = MaterialTheme.typography.bodyLarge.copy(
                         textDecoration = if (task.isChecked) TextDecoration.LineThrough else TextDecoration.None
                     ),
-                    color = if (task.isChecked) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                    color = if (task.isChecked) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                     else MaterialTheme.colorScheme.onSurface,
                     fontWeight = if (task.isChecked) FontWeight.Normal else FontWeight.Medium
                 )
@@ -468,10 +401,10 @@ private fun TaskCardItem(
                     modifier = Modifier.size(28.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Outlined.DriveFileRenameOutline,
+                        imageVector = Icons.Rounded.Edit,
                         contentDescription = "Sửa task",
                         modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
                     )
                 }
             }
@@ -482,10 +415,10 @@ private fun TaskCardItem(
                     modifier = Modifier.size(28.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Outlined.Delete,
+                        imageVector = Icons.Rounded.Delete,
                         contentDescription = "Xóa task",
                         modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
                     )
                 }
             }
@@ -731,14 +664,17 @@ fun ModernMarkdownEditorDialog(
                     },
                     navigationIcon = {
                         IconButton(onClick = onDismiss) {
-                            Icon(Icons.Outlined.Close, contentDescription = "Đóng")
+                            Icon(Icons.Rounded.Close, contentDescription = "Đóng")
                         }
                     },
                     actions = {
-                        TextButton(onClick = { onSave(textFieldValue.text) }) {
-                            Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Lưu", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        IconButton(onClick = { onSave(textFieldValue.text) }) {
+                            Icon(
+                                Icons.Rounded.Save,
+                                contentDescription = "Lưu",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -840,13 +776,13 @@ fun ModernMarkdownEditorDialog(
 @Composable
 private fun ToolbarButton(label: String, onClick: () -> Unit) {
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
         modifier = Modifier.clickable { onClick() }
     ) {
         Text(
             text = label,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface

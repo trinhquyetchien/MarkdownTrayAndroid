@@ -1,19 +1,21 @@
 package com.trinhquyetchien.markdowntray.screens
 
+import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,21 +30,21 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.ArrowForward
-import androidx.compose.material.icons.outlined.AccessTime
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Event
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Repeat
-import androidx.compose.material.icons.outlined.TouchApp
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.rounded.AccessTime
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Alarm
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.DateRange
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Event
+import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -53,6 +55,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -71,11 +75,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -88,11 +92,9 @@ import com.trinhquyetchien.markdowntray.data.CalendarOccurrence
 import com.trinhquyetchien.markdowntray.data.CalendarUtils
 import com.trinhquyetchien.markdowntray.data.CalendarViewMode
 import com.trinhquyetchien.markdowntray.data.StorageManager
-import com.trinhquyetchien.markdowntray.data.SyncStatusInfo
-import com.trinhquyetchien.markdowntray.ui.theme.StatusGreen
-import com.trinhquyetchien.markdowntray.ui.theme.StatusOrange
 import com.trinhquyetchien.markdowntray.viewmodel.AppViewModelFactory
 import com.trinhquyetchien.markdowntray.viewmodel.CalendarViewModel
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -115,57 +117,44 @@ fun CalendarScreen(
         CalendarUtils.getOccurrencesForDate(uiState.events, uiState.selectedYMD)
     }
 
+    var showRecurringChoiceDialog by remember { mutableStateOf(false) }
+    var pendingAction by remember { mutableStateOf<((Boolean) -> Unit)?>(null) }
+
+    // Date Picker Dialog để chọn nhanh bất kỳ ngày nào
+    val openDatePicker = {
+        val cal = uiState.selectedCalendar
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                val newCal = Calendar.getInstance().apply {
+                    set(year, month, dayOfMonth)
+                }
+                viewModel.selectDate(CalendarUtils.formatYMD(newCal.time), newCal)
+            },
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "Lịch biểu",
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleLarge
-                            )
-                        }
-
-                        // Sync Status pill
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable {
-                                    viewModel.loadEvents()
-                                    Toast.makeText(context, "Đã kiểm tra đồng bộ", Toast.LENGTH_SHORT).show()
-                                }
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (uiState.syncInfo?.isSynced == true) StatusGreen
-                                        else StatusOrange
-                                    )
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = uiState.syncInfo?.statusText ?: "Đang kiểm tra...",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+                    Text(
+                        text = "Lịch biểu",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleLarge
+                    )
                 },
                 actions = {
-                    IconButton(onClick = {
-                        viewModel.loadEvents()
-                        Toast.makeText(context, "Đã làm mới lịch", Toast.LENGTH_SHORT).show()
-                    }) {
+                    // Nút chọn ngày tháng bất kỳ (DatePicker)
+                    IconButton(onClick = openDatePicker) {
                         Icon(
-                            imageVector = Icons.Outlined.Refresh,
-                            contentDescription = "Làm mới",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            imageVector = Icons.Rounded.DateRange,
+                            contentDescription = "Chọn ngày",
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 },
@@ -177,10 +166,11 @@ fun CalendarScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { viewModel.setShowNewEventDialog(true) },
+                shape = CircleShape,
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             ) {
-                Icon(Icons.Outlined.Add, contentDescription = "Thêm sự kiện")
+                Icon(Icons.Rounded.Add, contentDescription = "Thêm sự kiện")
             }
         }
     ) { innerPadding ->
@@ -189,96 +179,49 @@ fun CalendarScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Header Controls: 4 View Modes (Danh sách ngày, Kéo thả Timeline, Tuần, Tháng)
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Navigation prev/today/next
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(
-                            onClick = { viewModel.navigatePrevious() },
-                            modifier = Modifier.size(34.dp)
-                        ) {
-                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Trước", modifier = Modifier.size(18.dp))
-                        }
+            // 1. THANH CHUYỂN ĐỔI CHẾ ĐỘ XEM ("Danh sách" & "Lịch") VÀ THANH ĐIỀU HƯỚNG THỜI GIAN
+            TopTimeNavBar(
+                selectedCalendar = uiState.selectedCalendar,
+                selectedYMD = uiState.selectedYMD,
+                todayYMD = uiState.todayYMD,
+                viewMode = uiState.viewMode,
+                allEvents = uiState.events,
+                onSelectDate = { ymd, cal -> viewModel.selectDate(ymd, cal) },
+                onNavigatePrevWeek = { viewModel.navigateWeek(-1) },
+                onNavigateNextWeek = { viewModel.navigateWeek(1) },
+                onNavigateToday = { viewModel.navigateToday() },
+                onOpenDatePicker = openDatePicker,
+                onViewModeChange = { mode -> viewModel.setViewMode(mode) }
+            )
 
-                        TextButton(
-                            onClick = { viewModel.navigateToday() },
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp)
-                        ) {
-                            Text(
-                                text = if (uiState.selectedYMD == uiState.todayYMD) "Hôm nay" else "Hôm nay",
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontSize = 13.sp
-                            )
-                        }
-
-                        IconButton(
-                            onClick = { viewModel.navigateNext() },
-                            modifier = Modifier.size(34.dp)
-                        ) {
-                            Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = "Sau", modifier = Modifier.size(18.dp))
-                        }
-                    }
-
-                    // Mode switch tabs
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .padding(2.dp)
-                    ) {
-                        ViewModeButton(
-                            label = "DS",
-                            selected = uiState.viewMode == CalendarViewMode.DAY,
-                            onClick = { viewModel.setViewMode(CalendarViewMode.DAY) }
-                        )
-                        ViewModeButton(
-                            label = "Giờ",
-                            selected = uiState.viewMode == CalendarViewMode.TIMELINE,
-                            onClick = { viewModel.setViewMode(CalendarViewMode.TIMELINE) }
-                        )
-                        ViewModeButton(
-                            label = "Tuần",
-                            selected = uiState.viewMode == CalendarViewMode.WEEK,
-                            onClick = { viewModel.setViewMode(CalendarViewMode.WEEK) }
-                        )
-                        ViewModeButton(
-                            label = "Tháng",
-                            selected = uiState.viewMode == CalendarViewMode.MONTH,
-                            onClick = { viewModel.setViewMode(CalendarViewMode.MONTH) }
-                        )
-                    }
+            // Tiêu đề ngày tháng hiện tại
+            val currentDayDisplay = remember(uiState.selectedCalendar.time) {
+                val cal = uiState.selectedCalendar
+                val dayOfWeek = when (cal.get(Calendar.DAY_OF_WEEK)) {
+                    Calendar.MONDAY -> "Thứ Hai"
+                    Calendar.TUESDAY -> "Thứ Ba"
+                    Calendar.WEDNESDAY -> "Thứ Tư"
+                    Calendar.THURSDAY -> "Thứ Năm"
+                    Calendar.FRIDAY -> "Thứ Sáu"
+                    Calendar.SATURDAY -> "Thứ Bảy"
+                    Calendar.SUNDAY -> "Chủ Nhật"
+                    else -> ""
                 }
+                "$dayOfWeek, ngày ${cal.get(Calendar.DAY_OF_MONTH)} tháng ${cal.get(Calendar.MONTH) + 1} năm ${cal.get(Calendar.YEAR)}"
             }
 
-            // Current date title banner
-            val headerTitle = when (uiState.viewMode) {
-                CalendarViewMode.DAY, CalendarViewMode.TIMELINE -> SimpleDateFormat("EEEE, dd MMMM yyyy", Locale.forLanguageTag("vi-VN")).format(uiState.selectedCalendar.time)
-                CalendarViewMode.WEEK -> "Tuần ${uiState.selectedCalendar.get(Calendar.WEEK_OF_YEAR)} - Tháng ${uiState.selectedCalendar.get(Calendar.MONTH) + 1}/${uiState.selectedCalendar.get(Calendar.YEAR)}"
-                CalendarViewMode.MONTH -> SimpleDateFormat("MMMM yyyy", Locale.forLanguageTag("vi-VN")).format(uiState.selectedCalendar.time)
-            }
             Text(
-                text = headerTitle.replaceFirstChar { it.uppercase() },
+                text = currentDayDisplay,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
             )
 
-            // Content body according to view mode
+            // 2. NỘI DUNG THEO 2 CHẾ ĐỘ XEM: DANH SÁCH HOẶC LỊCH
             when (uiState.viewMode) {
                 CalendarViewMode.DAY -> {
+                    // Chế độ "Danh sách"
                     DayScheduleView(
                         selectedDateYMD = uiState.selectedYMD,
                         occurrences = dayOccurrences,
@@ -287,9 +230,10 @@ fun CalendarScreen(
                     )
                 }
                 CalendarViewMode.TIMELINE -> {
-                    // Kéo thả và hiển thị trực quan 24 giờ như trên Web
+                    // Chế độ "Lịch" (Timeline 24h hỗ trợ kéo thả mượt mà, tránh va chạm, tap/drag tạo mới)
                     DraggableTimelineView(
                         selectedDateYMD = uiState.selectedYMD,
+                        todayYMD = uiState.todayYMD,
                         occurrences = dayOccurrences,
                         onOccurrenceClick = { occ -> viewModel.setEditingOccurrence(occ) },
                         onOccurrenceTimeChanged = { occ, newStartH, newStartM, newEndH, newEndM ->
@@ -297,33 +241,41 @@ fun CalendarScreen(
                             val eStr = String.format(Locale.US, "%sT%02d:%02d:00", occ.occurrenceDate, newEndH, newEndM)
                             val updated = occ.event.copy(start = sStr, end = eStr)
                             if (occ.isRecurring) {
-                                viewModel.updateRecurringEvent(occ.event, updated, occ.occurrenceDate, applyToAll = true)
+                                pendingAction = { applyToAll ->
+                                    viewModel.updateRecurringEvent(occ.event, updated, occ.occurrenceDate, applyToAll = applyToAll)
+                                    Toast.makeText(context, "Đã cập nhật giờ sự kiện", Toast.LENGTH_SHORT).show()
+                                }
+                                showRecurringChoiceDialog = true
                             } else {
                                 viewModel.updateEvent(updated)
+                                Toast.makeText(context, "Đã cập nhật giờ sự kiện", Toast.LENGTH_SHORT).show()
                             }
-                            Toast.makeText(context, "Đã cập nhật giờ sự kiện", Toast.LENGTH_SHORT).show()
                         },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                CalendarViewMode.WEEK -> {
-                    WeekScheduleView(
-                        anchorCalendar = uiState.selectedCalendar,
-                        selectedYMD = uiState.selectedYMD,
-                        allEvents = uiState.events,
-                        onSelectDate = { ymd, cal -> viewModel.selectDate(ymd, cal) },
-                        onOccurrenceClick = { occ -> viewModel.setEditingOccurrence(occ) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                CalendarViewMode.MONTH -> {
-                    MonthScheduleView(
-                        anchorCalendar = uiState.selectedCalendar,
-                        selectedYMD = uiState.selectedYMD,
-                        allEvents = uiState.events,
-                        onSelectDate = { ymd, cal ->
-                            viewModel.selectDate(ymd, cal)
-                            viewModel.setViewMode(CalendarViewMode.TIMELINE)
+                        onCreateEventAtTime = { hour, minute ->
+                            // Tap hoặc drag để tạo task mới tại mốc giờ
+                            val sH = hour.coerceIn(0, 23)
+                            val sM = (minute / 15) * 15
+                            val eH = (sH + (sM + 60) / 60).coerceAtMost(23)
+                            val eM = (sM + 60) % 60
+                            val startTimeStr = String.format(Locale.US, "%02d:%02d", sH, sM)
+                            val endTimeStr = String.format(Locale.US, "%02d:%02d", eH, eM)
+                            val tempEvent = CalendarEvent(
+                                id = System.currentTimeMillis().toString(),
+                                title = "",
+                                start = "${uiState.selectedYMD}T${startTimeStr}:00",
+                                end = "${uiState.selectedYMD}T${endTimeStr}:00"
+                            )
+                            viewModel.setEditingOccurrence(
+                                CalendarOccurrence(
+                                    event = tempEvent,
+                                    occurrenceDate = uiState.selectedYMD,
+                                    startHour = sH,
+                                    startMinute = sM,
+                                    endHour = eH,
+                                    endMinute = eM,
+                                    isRecurring = false
+                                )
+                            )
                         },
                         modifier = Modifier.weight(1f)
                     )
@@ -339,12 +291,10 @@ fun CalendarScreen(
             existingEvent = null,
             occurrenceDate = uiState.selectedYMD,
             onDismiss = { viewModel.setShowNewEventDialog(false) },
-            onSave = { updatedEvent ->
-                val success = viewModel.addEvent(updatedEvent)
+            onSave = { newEvent ->
+                val success = viewModel.addEvent(newEvent)
                 if (success) {
                     Toast.makeText(context, "Đã thêm sự kiện", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(context, "Lỗi thêm sự kiện", Toast.LENGTH_SHORT).show()
                 }
                 viewModel.setShowNewEventDialog(false)
             },
@@ -352,18 +302,26 @@ fun CalendarScreen(
         )
     }
 
+    // Modal sửa Occurrence hiện tại
     if (uiState.editingOccurrence != null) {
         val occ = uiState.editingOccurrence!!
-        var showRecurringChoiceDialog by remember { mutableStateOf(false) }
-        var pendingAction by remember { mutableStateOf<((applyToAll: Boolean) -> Unit)?>(null) }
+        val isNewFromTimeline = occ.event.title.isEmpty()
 
         EventEditDialog(
             initialDateYMD = occ.occurrenceDate,
-            existingEvent = occ.event,
+            existingEvent = if (isNewFromTimeline) null else occ.event,
             occurrenceDate = occ.occurrenceDate,
+            defaultStartTime = String.format(Locale.US, "%02d:%02d", occ.startHour, occ.startMinute),
+            defaultEndTime = String.format(Locale.US, "%02d:%02d", occ.endHour, occ.endMinute),
             onDismiss = { viewModel.setEditingOccurrence(null) },
             onSave = { updatedEvent ->
-                if (occ.isRecurring) {
+                if (isNewFromTimeline) {
+                    val success = viewModel.addEvent(updatedEvent)
+                    if (success) {
+                        Toast.makeText(context, "Đã tạo sự kiện", Toast.LENGTH_SHORT).show()
+                    }
+                    viewModel.setEditingOccurrence(null)
+                } else if (occ.isRecurring) {
                     pendingAction = { applyToAll ->
                         val success = viewModel.updateRecurringEvent(
                             existingEvent = occ.event,
@@ -384,25 +342,27 @@ fun CalendarScreen(
                     viewModel.setEditingOccurrence(null)
                 }
             },
-            onDelete = {
-                if (occ.isRecurring) {
-                    pendingAction = { applyToAll ->
-                        val success = viewModel.deleteRecurringEvent(
-                            existingEvent = occ.event,
-                            occurrenceDate = occ.occurrenceDate,
-                            applyToAll = applyToAll
-                        )
+            onDelete = if (isNewFromTimeline) null else {
+                {
+                    if (occ.isRecurring) {
+                        pendingAction = { applyToAll ->
+                            val success = viewModel.deleteRecurringEvent(
+                                existingEvent = occ.event,
+                                occurrenceDate = occ.occurrenceDate,
+                                applyToAll = applyToAll
+                            )
+                            if (success) {
+                                Toast.makeText(context, "Đã xóa sự kiện", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        showRecurringChoiceDialog = true
+                    } else {
+                        val success = viewModel.deleteEvent(occ.event.id)
                         if (success) {
                             Toast.makeText(context, "Đã xóa sự kiện", Toast.LENGTH_SHORT).show()
                         }
+                        viewModel.setEditingOccurrence(null)
                     }
-                    showRecurringChoiceDialog = true
-                } else {
-                    val success = viewModel.deleteEvent(occ.event.id)
-                    if (success) {
-                        Toast.makeText(context, "Đã xóa sự kiện", Toast.LENGTH_SHORT).show()
-                    }
-                    viewModel.setEditingOccurrence(null)
                 }
             }
         )
@@ -413,8 +373,8 @@ fun CalendarScreen(
                     showRecurringChoiceDialog = false
                     pendingAction = null
                 },
-                title = { Text("Lặp lại sự kiện", fontWeight = FontWeight.SemiBold) },
-                text = { Text("Bạn muốn áp dụng thay đổi này chỉ cho ngày này hay toàn bộ chuỗi sự kiện?") },
+                title = { Text("Lặp lại công việc", fontWeight = FontWeight.SemiBold) },
+                text = { Text("Công việc này được lặp lại hàng tuần. Bạn muốn áp dụng thay đổi như thế nào?") },
                 confirmButton = {
                     TextButton(onClick = {
                         pendingAction?.invoke(true)
@@ -422,7 +382,7 @@ fun CalendarScreen(
                         pendingAction = null
                         viewModel.setEditingOccurrence(null)
                     }) {
-                        Text("Tất cả sự kiện", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Text("Áp dụng cho toàn bộ các lần lặp lại sau này", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
                 },
                 dismissButton = {
@@ -432,9 +392,160 @@ fun CalendarScreen(
                         pendingAction = null
                         viewModel.setEditingOccurrence(null)
                     }) {
-                        Text("Chỉ ngày này")
+                        Text("Chỉ áp dụng cho công việc này")
                     }
                 }
+            )
+        }
+    }
+}
+
+// -------------------------------------------------------------
+// Thanh điều hướng thời gian trên cùng (Tuần, Các nút ngày, DatePicker, Chuyển chế độ)
+// -------------------------------------------------------------
+@Composable
+private fun TopTimeNavBar(
+    selectedCalendar: Calendar,
+    selectedYMD: String,
+    todayYMD: String,
+    viewMode: CalendarViewMode,
+    allEvents: List<CalendarEvent>,
+    onSelectDate: (String, Calendar) -> Unit,
+    onNavigatePrevWeek: () -> Unit,
+    onNavigateNextWeek: () -> Unit,
+    onNavigateToday: () -> Unit,
+    onOpenDatePicker: () -> Unit,
+    onViewModeChange: (CalendarViewMode) -> Unit
+) {
+    val weekDates = remember(selectedCalendar) {
+        CalendarUtils.getWeekDates(selectedCalendar)
+    }
+    val dayNames = listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN")
+
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Hàng 1: Nút tuần trước, Hôm nay, Tuần sau + Tab chuyển chế độ (Danh sách / Lịch)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Điều hướng tuần
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onNavigatePrevWeek,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Tuần trước", modifier = Modifier.size(18.dp))
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                        modifier = Modifier.clickable { onNavigateToday() }
+                    ) {
+                        Text(
+                            text = "Hôm nay",
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+
+                    IconButton(
+                        onClick = onNavigateNextWeek,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = "Tuần sau", modifier = Modifier.size(18.dp))
+                    }
+                }
+
+                // 2 Chế độ xem duy nhất: "Danh sách" & "Lịch"
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
+                        .padding(3.dp)
+                ) {
+                    ViewModeButton(
+                        label = "Danh sách",
+                        selected = viewMode == CalendarViewMode.DAY,
+                        onClick = { onViewModeChange(CalendarViewMode.DAY) }
+                    )
+                    ViewModeButton(
+                        label = "Lịch",
+                        selected = viewMode == CalendarViewMode.TIMELINE,
+                        onClick = { onViewModeChange(CalendarViewMode.TIMELINE) }
+                    )
+                }
+            }
+
+            // Hàng 2: Dải 7 nút ngày trong tuần hiện tại
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                weekDates.forEachIndexed { idx, date ->
+                    val dateCal = Calendar.getInstance().apply { time = date }
+                    val ymd = CalendarUtils.formatYMD(date)
+                    val isSelected = ymd == selectedYMD
+                    val isToday = ymd == todayYMD
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(
+                                if (isSelected) MaterialTheme.colorScheme.primary
+                                else if (isToday) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                                else Color.Transparent
+                            )
+                            .clickable { onSelectDate(ymd, dateCal) }
+                            .padding(vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = dayNames[idx],
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = SimpleDateFormat("dd", Locale.getDefault()).format(date),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                        )
+
+                        // Chấm chỉ báo sự kiện có trong ngày
+                        val dayOccs = CalendarUtils.getOccurrencesForDate(allEvents, ymd)
+                        if (dayOccs.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(4.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary)
+                            )
+                        } else {
+                            Spacer(modifier = Modifier.height(7.dp))
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.padding(top = 4.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
             )
         }
     }
@@ -447,40 +558,141 @@ private fun ViewModeButton(
     onClick: () -> Unit
 ) {
     Surface(
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(12.dp),
         color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
         modifier = Modifier.clickable { onClick() }
     ) {
         Text(
             text = label,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             style = MaterialTheme.typography.labelSmall,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
             color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
 
 // -------------------------------------------------------------
-// Interactive 24H Draggable Timeline View (Tương tự Calendar Web)
+// Interactive 24H Draggable Timeline View (Smooth animation + Collision Avoidance + Tap/Drag to Add + Current Time Indicator)
 // -------------------------------------------------------------
+private data class OccurrenceLayout(
+    val occurrence: CalendarOccurrence,
+    val columnIndex: Int,
+    val totalColumns: Int
+)
+
+private fun computeCollisionLayout(occurrences: List<CalendarOccurrence>): List<OccurrenceLayout> {
+    if (occurrences.isEmpty()) return emptyList()
+
+    // Chuyển sang danh sách sự kiện có phút bắt đầu/kết thúc
+    class TempItem(val occ: CalendarOccurrence, val startMin: Int, val endMin: Int)
+    val items = occurrences.map { occ ->
+        val s = occ.startHour * 60 + occ.startMinute
+        val e = (occ.endHour * 60 + occ.endMinute).let { if (it <= s) s + 30 else it }
+        TempItem(occ, s, e)
+    }.sortedWith(compareBy({ it.startMin }, { it.endMin }))
+
+    // Thuật toán gán cột (interval coloring)
+    val columns = mutableListOf<MutableList<TempItem>>()
+    val assignedColumn = mutableMapOf<String, Int>()
+
+    for (item in items) {
+        var placed = false
+        for (colIdx in columns.indices) {
+            val col = columns[colIdx]
+            if (col.last().endMin <= item.startMin) {
+                col.add(item)
+                assignedColumn[item.occ.event.id] = colIdx
+                placed = true
+                break
+            }
+        }
+        if (!placed) {
+            assignedColumn[item.occ.event.id] = columns.size
+            columns.add(mutableListOf(item))
+        }
+    }
+
+    // Nhóm các cụm va chạm (overlapping clusters) để tính tổng số cột
+    val clusters = mutableListOf<MutableList<TempItem>>()
+    var currentCluster = mutableListOf<TempItem>()
+    var clusterEnd = -1
+
+    for (item in items) {
+        if (currentCluster.isEmpty()) {
+            currentCluster.add(item)
+            clusterEnd = item.endMin
+        } else if (item.startMin < clusterEnd) {
+            currentCluster.add(item)
+            clusterEnd = maxOf(clusterEnd, item.endMin)
+        } else {
+            clusters.add(currentCluster)
+            currentCluster = mutableListOf(item)
+            clusterEnd = item.endMin
+        }
+    }
+    if (currentCluster.isNotEmpty()) {
+        clusters.add(currentCluster)
+    }
+
+    val totalColumnsMap = mutableMapOf<String, Int>()
+    for (cluster in clusters) {
+        val maxCol = cluster.maxOf { assignedColumn[it.occ.event.id] ?: 0 } + 1
+        for (it in cluster) {
+            totalColumnsMap[it.occ.event.id] = maxCol
+        }
+    }
+
+    return items.map { item ->
+        OccurrenceLayout(
+            occurrence = item.occ,
+            columnIndex = assignedColumn[item.occ.event.id] ?: 0,
+            totalColumns = totalColumnsMap[item.occ.event.id] ?: 1
+        )
+    }
+}
+
 @Composable
 private fun DraggableTimelineView(
     selectedDateYMD: String,
+    todayYMD: String,
     occurrences: List<CalendarOccurrence>,
     onOccurrenceClick: (CalendarOccurrence) -> Unit,
     onOccurrenceTimeChanged: (CalendarOccurrence, startH: Int, startM: Int, endH: Int, endM: Int) -> Unit,
+    onCreateEventAtTime: (hour: Int, minute: Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val hourHeightDp = 60.dp
+    val hourHeightDp = 64.dp
     val density = LocalDensity.current
     val hourHeightPx = with(density) { hourHeightDp.toPx() }
 
     val scrollState = rememberScrollState()
 
-    // Tự động scroll đến 8h sáng lúc ban đầu
+    // Tự động scroll đến 7h sáng
     LaunchedEffect(Unit) {
-        scrollState.scrollTo((8 * hourHeightPx).toInt())
+        scrollState.scrollTo((7 * hourHeightPx).toInt())
+    }
+
+    // Tính toán bố cục đa cột né va chạm
+    val layouts = remember(occurrences) {
+        computeCollisionLayout(occurrences)
+    }
+
+    // 1. Đường chỉ thời gian thực hiện tại (Current Time Indicator - Chỉ hiển thị khi đang xem ngày HÔM NAY)
+    val isToday = selectedDateYMD == todayYMD
+    var currentMinuteOfDay by remember {
+        val now = Calendar.getInstance()
+        mutableIntStateOf(now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE))
+    }
+
+    LaunchedEffect(isToday) {
+        if (isToday) {
+            while (true) {
+                val now = Calendar.getInstance()
+                currentMinuteOfDay = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
+                delay(30_000L) // Cập nhật mỗi 30 giây
+            }
+        }
     }
 
     Box(
@@ -488,13 +700,21 @@ private fun DraggableTimelineView(
             .fillMaxSize()
             .verticalScroll(scrollState)
     ) {
-        // Grid 24 giờ
+        // Grid 24 giờ & Cho phép click/tap vào chỗ trống để tạo sự kiện mới
         Column(modifier = Modifier.fillMaxWidth()) {
             for (hour in 0..23) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(hourHeightDp),
+                        .height(hourHeightDp)
+                        .pointerInput(hour) {
+                            detectTapGestures(
+                                onTap = { offset ->
+                                    val minute = ((offset.y / hourHeightPx) * 60).toInt()
+                                    onCreateEventAtTime(hour, minute)
+                                }
+                            )
+                        },
                     verticalAlignment = Alignment.Top
                 ) {
                     Text(
@@ -506,23 +726,88 @@ private fun DraggableTimelineView(
                             .padding(start = 8.dp, top = 2.dp)
                     )
                     HorizontalDivider(
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
                         modifier = Modifier.weight(1f)
                     )
                 }
             }
         }
 
-        // Overlay các sự kiện có thể kéo thả thay đổi giờ
-        occurrences.forEach { occ ->
-            DraggableEventBlock(
-                occurrence = occ,
-                hourHeightPx = hourHeightPx,
-                onClick = { onOccurrenceClick(occ) },
-                onDragCommit = { startH, startM, endH, endM ->
-                    onOccurrenceTimeChanged(occ, startH, startM, endH, endM)
+        // Overlay các sự kiện hỗ trợ kéo thả mượt mà & né va chạm thông minh
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 54.dp, end = 12.dp)
+        ) {
+            val totalAvailableWidth = maxWidth
+
+            layouts.forEach { layout ->
+                val totalCols = layout.totalColumns
+                val colIdx = layout.columnIndex
+                val colWidth = totalAvailableWidth / totalCols
+
+                DraggableEventBlock(
+                    occurrence = layout.occurrence,
+                    hourHeightPx = hourHeightPx,
+                    offsetX = colWidth * colIdx,
+                    itemWidth = colWidth - 4.dp,
+                    onClick = { onOccurrenceClick(layout.occurrence) },
+                    onDragCommit = { startH, startM, endH, endM ->
+                        onOccurrenceTimeChanged(layout.occurrence, startH, startM, endH, endM)
+                    }
+                )
+            }
+        }
+
+        // ĐƯỜNG KẺ ĐỎ HIỆN TẠI (Current Time Line) - CHỈ HIỂN THỊ KHI LÀ NGÀY HÔM NAY
+        if (isToday) {
+            val currentTimeTopPx = (currentMinuteOfDay / 60f) * hourHeightPx
+            val currentTimeTopDp = with(density) { currentTimeTopPx.toDp() }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .offset(y = currentTimeTopDp - 6.dp)
+                    .padding(end = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Mốc chấm đỏ + nhãn giờ
+                Box(
+                    modifier = Modifier
+                        .width(52.dp)
+                        .padding(start = 4.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = Color(0xFFEF4444)
+                    ) {
+                        Text(
+                            text = String.format(Locale.US, "%02d:%02d", currentMinuteOfDay / 60, currentMinuteOfDay % 60),
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                        )
+                    }
                 }
-            )
+
+                // Chấm tròn đỏ
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFEF4444))
+                )
+
+                // Đường kẻ ngang đỏ đậm xuyên suốt
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(2.dp)
+                        .background(Color(0xFFEF4444))
+                )
+            }
         }
     }
 }
@@ -531,6 +816,8 @@ private fun DraggableTimelineView(
 private fun DraggableEventBlock(
     occurrence: CalendarOccurrence,
     hourHeightPx: Float,
+    offsetX: androidx.compose.ui.unit.Dp,
+    itemWidth: androidx.compose.ui.unit.Dp,
     onClick: () -> Unit,
     onDragCommit: (startH: Int, startM: Int, endH: Int, endM: Int) -> Unit
 ) {
@@ -539,8 +826,12 @@ private fun DraggableEventBlock(
     val baseTopPx = (occurrence.startHour + occurrence.startMinute / 60f) * hourHeightPx
     val heightPx = (durationHours * hourHeightPx).coerceAtLeast(36f)
 
-    var dragOffsetY by remember(baseTopPx) { mutableFloatStateOf(0f) }
     val density = LocalDensity.current
+
+    // TỐI ƯU HIỆU NĂNG: Sử dụng graphicsLayer / fast translationY và IntOffset
+    // Tránh recomposition toàn bộ màn hình khi kéo
+    var dragDeltaY by remember { mutableFloatStateOf(0f) }
+    var isDragging by remember { mutableStateOf(false) }
 
     val evColor = try {
         Color(android.graphics.Color.parseColor(occurrence.event.color))
@@ -548,28 +839,37 @@ private fun DraggableEventBlock(
         MaterialTheme.colorScheme.primary
     }
 
-    val topPx = baseTopPx + dragOffsetY
-    val topDp = with(density) { topPx.toDp() }
+    val baseTopDp = with(density) { baseTopPx.toDp() }
     val heightDp = with(density) { heightPx.toDp() }
 
     Surface(
         modifier = Modifier
-            .padding(start = 60.dp, end = 16.dp)
-            .offset(y = topDp)
-            .fillMaxWidth()
+            .offset(x = offsetX, y = baseTopDp)
+            .graphicsLayer {
+                translationY = dragDeltaY
+                shadowElevation = if (isDragging) 8.dp.toPx() else 2.dp.toPx()
+                alpha = if (isDragging) 0.95f else 0.90f
+                scaleX = if (isDragging) 1.02f else 1.0f
+                scaleY = if (isDragging) 1.02f else 1.0f
+            }
+            .width(itemWidth)
             .height(heightDp)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(12.dp))
             .pointerInput(occurrence.event.id) {
                 detectDragGestures(
+                    onDragStart = {
+                        isDragging = true
+                    },
                     onDrag = { change, dragAmount ->
                         change.consume()
-                        dragOffsetY += dragAmount.y
+                        dragDeltaY += dragAmount.y
                     },
                     onDragEnd = {
-                        val newY = (baseTopPx + dragOffsetY).coerceIn(0f, 23.5f * hourHeightPx)
+                        val currentY = baseTopPx + dragDeltaY
+                        val newY = currentY.coerceIn(0f, 23.5f * hourHeightPx)
                         val totalMinutes = (newY / hourHeightPx * 60f).roundToInt()
-                        // Làm tròn về mỗi 15 phút
-                        val snappedMin = (totalMinutes / 15) * 15
+                        // Snap chính xác mốc 15 phút
+                        val snappedMin = ((totalMinutes + 7) / 15) * 15
                         val newStartH = snappedMin / 60
                         val newStartM = snappedMin % 60
 
@@ -577,17 +877,19 @@ private fun DraggableEventBlock(
                         val newEndH = endTotalMin / 60
                         val newEndM = endTotalMin % 60
 
-                        dragOffsetY = 0f
+                        dragDeltaY = 0f
+                        isDragging = false
                         onDragCommit(newStartH, newStartM, newEndH, newEndM)
                     },
                     onDragCancel = {
-                        dragOffsetY = 0f
+                        dragDeltaY = 0f
+                        isDragging = false
                     }
                 )
             }
             .clickable { onClick() },
-        color = evColor.copy(alpha = 0.88f),
-        shape = RoundedCornerShape(8.dp),
+        color = evColor.copy(alpha = 0.92f),
+        shape = RoundedCornerShape(12.dp),
         shadowElevation = 2.dp
     ) {
         Row(
@@ -597,14 +899,26 @@ private fun DraggableEventBlock(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = occurrence.event.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = occurrence.event.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    if (occurrence.event.alarmEnabled) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Rounded.NotificationsActive,
+                            contentDescription = "Báo thức",
+                            tint = Color.White.copy(alpha = 0.9f),
+                            modifier = Modifier.size(13.dp)
+                        )
+                    }
+                }
                 Text(
                     text = String.format(Locale.US, "%02d:%02d - %02d:%02d", occurrence.startHour, occurrence.startMinute, occurrence.endHour, occurrence.endMinute),
                     style = MaterialTheme.typography.labelSmall,
@@ -613,7 +927,7 @@ private fun DraggableEventBlock(
             }
 
             Icon(
-                imageVector = Icons.Outlined.TouchApp,
+                imageVector = Icons.Rounded.TouchApp,
                 contentDescription = "Kéo để đổi giờ",
                 tint = Color.White.copy(alpha = 0.6f),
                 modifier = Modifier.size(14.dp)
@@ -623,7 +937,7 @@ private fun DraggableEventBlock(
 }
 
 // -------------------------------------------------------------
-// Day View: Timeline 24h
+// Chế độ "Danh sách": Hiển thị các công việc/sự kiện trong ngày
 // -------------------------------------------------------------
 @Composable
 private fun DayScheduleView(
@@ -639,19 +953,19 @@ private fun DayScheduleView(
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
-                    imageVector = Icons.Outlined.Event,
+                    imageVector = Icons.Rounded.Event,
                     contentDescription = null,
                     modifier = Modifier.size(48.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Không có lịch hẹn nào trong ngày",
+                    text = "Không có công việc nào trong ngày",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "Bấm dấu + để thêm sự kiện mới",
+                    text = "Bấm dấu + bên dưới để thêm công việc mới",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )
@@ -698,16 +1012,16 @@ private fun EventCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(16.dp))
             .clickable { onClick() },
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Color accent bar
@@ -733,10 +1047,20 @@ private fun EventCard(
                         modifier = Modifier.weight(1f)
                     )
 
+                    if (ev.alarmEnabled) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Rounded.NotificationsActive,
+                            contentDescription = "Báo thức",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
                     if (occurrence.isRecurring) {
                         Spacer(modifier = Modifier.width(4.dp))
                         Icon(
-                            imageVector = Icons.Outlined.Repeat,
+                            imageVector = Icons.Rounded.Repeat,
                             contentDescription = "Lặp lại",
                             modifier = Modifier.size(16.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -744,11 +1068,11 @@ private fun EventCard(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(3.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Outlined.AccessTime,
+                        imageVector = Icons.Rounded.AccessTime,
                         contentDescription = null,
                         modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -760,6 +1084,23 @@ private fun EventCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Medium
                     )
+
+                    if (ev.alarmEnabled) {
+                        val leadText = if (ev.alarmLeadMinutes == 0) "Đúng giờ" else "Trước ${ev.alarmLeadMinutes}p"
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                        ) {
+                            Text(
+                                text = "⏰ $leadText",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                 }
 
                 if (ev.note.isNotBlank()) {
@@ -778,207 +1119,7 @@ private fun EventCard(
 }
 
 // -------------------------------------------------------------
-// Week View
-// -------------------------------------------------------------
-@Composable
-private fun WeekScheduleView(
-    anchorCalendar: Calendar,
-    selectedYMD: String,
-    allEvents: List<CalendarEvent>,
-    onSelectDate: (String, Calendar) -> Unit,
-    onOccurrenceClick: (CalendarOccurrence) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val weekDates = remember(anchorCalendar) {
-        CalendarUtils.getWeekDates(anchorCalendar)
-    }
-
-    val dayNames = listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN")
-
-    Column(modifier = modifier.fillMaxSize()) {
-        // Week days header strip
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceAround
-        ) {
-            weekDates.forEachIndexed { idx, date ->
-                val dateCal = Calendar.getInstance().apply { time = date }
-                val ymd = CalendarUtils.formatYMD(date)
-                val isSelected = ymd == selectedYMD
-                val isToday = ymd == CalendarUtils.formatYMD(Date())
-
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            if (isSelected) MaterialTheme.colorScheme.primary
-                            else if (isToday) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                            else Color.Transparent
-                        )
-                        .clickable { onSelectDate(ymd, dateCal) }
-                        .padding(horizontal = 8.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = dayNames[idx],
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = SimpleDateFormat("dd", Locale.getDefault()).format(date),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal,
-                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-                    )
-
-                    // Event indicator dot
-                    val dayOccs = CalendarUtils.getOccurrencesForDate(allEvents, ymd)
-                    if (dayOccs.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Box(
-                            modifier = Modifier
-                                .size(4.dp)
-                                .clip(CircleShape)
-                                .background(if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary)
-                        )
-                    } else {
-                        Spacer(modifier = Modifier.height(7.dp))
-                    }
-                }
-            }
-        }
-
-        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
-
-        // Schedule of the selected date in week
-        val currentDayOccurrences = remember(allEvents, selectedYMD) {
-            CalendarUtils.getOccurrencesForDate(allEvents, selectedYMD)
-        }
-
-        DayScheduleView(
-            selectedDateYMD = selectedYMD,
-            occurrences = currentDayOccurrences,
-            onOccurrenceClick = onOccurrenceClick,
-            modifier = Modifier.weight(1f)
-        )
-    }
-}
-
-// -------------------------------------------------------------
-// Month View
-// -------------------------------------------------------------
-@Composable
-private fun MonthScheduleView(
-    anchorCalendar: Calendar,
-    selectedYMD: String,
-    allEvents: List<CalendarEvent>,
-    onSelectDate: (String, Calendar) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val monthGridDates = remember(anchorCalendar) {
-        CalendarUtils.getMonthGridDates(anchorCalendar)
-    }
-
-    val currentMonth = anchorCalendar.get(Calendar.MONTH)
-    val dayNames = listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN")
-
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 8.dp)
-    ) {
-        // Day names header
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceAround
-        ) {
-            dayNames.forEach { name ->
-                Text(
-                    text = name,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.width(42.dp),
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-        // 6 rows x 7 columns grid
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceEvenly
-        ) {
-            for (week in 0 until 6) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceAround
-                ) {
-                    for (day in 0 until 7) {
-                        val index = week * 7 + day
-                        val date = monthGridDates[index]
-                        val cal = Calendar.getInstance().apply { time = date }
-                        val ymd = CalendarUtils.formatYMD(date)
-                        val isThisMonth = cal.get(Calendar.MONTH) == currentMonth
-                        val isSelected = ymd == selectedYMD
-                        val isToday = ymd == CalendarUtils.formatYMD(Date())
-                        val dayOccs = CalendarUtils.getOccurrencesForDate(allEvents, ymd)
-
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (isSelected) MaterialTheme.colorScheme.primary
-                                    else if (isToday) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                                    else Color.Transparent
-                                )
-                                .clickable { onSelectDate(ymd, cal) }
-                                .padding(4.dp)
-                        ) {
-                            Text(
-                                text = SimpleDateFormat("d", Locale.getDefault()).format(date),
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary
-                                else if (isThisMonth) MaterialTheme.colorScheme.onSurface
-                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
-                            )
-
-                            if (dayOccs.isNotEmpty()) {
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    dayOccs.take(3).forEach { occ ->
-                                        val color = try {
-                                            Color(android.graphics.Color.parseColor(occ.event.color))
-                                        } catch (e: Exception) {
-                                            MaterialTheme.colorScheme.primary
-                                        }
-                                        Box(
-                                            modifier = Modifier
-                                                .size(4.dp)
-                                                .clip(CircleShape)
-                                                .background(if (isSelected) MaterialTheme.colorScheme.onPrimary else color)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// -------------------------------------------------------------
-// Dialog: Thêm / Sửa Sự kiện
+// Dialog: Thêm / Sửa Sự kiện (Tích hợp tính năng Báo thức / Nhắc nhở)
 // -------------------------------------------------------------
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -986,6 +1127,8 @@ private fun EventEditDialog(
     initialDateYMD: String,
     existingEvent: CalendarEvent?,
     occurrenceDate: String,
+    defaultStartTime: String? = null,
+    defaultEndTime: String? = null,
     onDismiss: () -> Unit,
     onSave: (CalendarEvent) -> Unit,
     onDelete: (() -> Unit)?
@@ -998,16 +1141,20 @@ private fun EventEditDialog(
 
     var dateStr by remember { mutableStateOf(occurrenceDate) }
 
-    val initialStart = if (existingEvent != null && existingEvent.start.length >= 16) {
+    val initialStart = defaultStartTime ?: if (existingEvent != null && existingEvent.start.length >= 16) {
         existingEvent.start.substring(11, 16)
     } else "09:00"
 
-    val initialEnd = if (existingEvent != null && existingEvent.end.length >= 16) {
+    val initialEnd = defaultEndTime ?: if (existingEvent != null && existingEvent.end.length >= 16) {
         existingEvent.end.substring(11, 16)
     } else "10:00"
 
     var startTime by remember { mutableStateOf(initialStart) }
     var endTime by remember { mutableStateOf(initialEnd) }
+
+    // Tính năng Báo thức / Nhắc nhở
+    var alarmEnabled by remember { mutableStateOf(existingEvent?.alarmEnabled ?: false) }
+    var alarmLeadMinutes by remember { mutableIntStateOf(existingEvent?.alarmLeadMinutes ?: 0) }
 
     val repeatDays = remember {
         mutableStateListOf<Int>().apply {
@@ -1036,6 +1183,14 @@ private fun EventEditDialog(
         Pair(0, "CN")
     )
 
+    val alarmLeadOptions = listOf(
+        Pair(0, "Đúng giờ"),
+        Pair(5, "Trước 5p"),
+        Pair(15, "Trước 15p"),
+        Pair(30, "Trước 30p"),
+        Pair(60, "Trước 1h")
+    )
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -1059,12 +1214,12 @@ private fun EventEditDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (existingEvent == null) "Thêm sự kiện" else "Sửa sự kiện",
+                        text = if (existingEvent == null) "Thêm công việc" else "Chi tiết công việc",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
                     IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Outlined.Close, contentDescription = "Đóng", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(Icons.Rounded.Close, contentDescription = "Đóng", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
@@ -1137,8 +1292,95 @@ private fun EventEditDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // TÍNH NĂNG BÁO THỨC / NHẮC NHỞ HẸN GIỜ
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Alarm,
+                                    contentDescription = null,
+                                    tint = if (alarmEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "Báo thức & Nhắc nhở",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = if (alarmEnabled) "Sẽ phát chuông/rung khi đến giờ" else "Tắt nhắc nhở",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Switch(
+                                checked = alarmEnabled,
+                                onCheckedChange = { alarmEnabled = it },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                                    checkedTrackColor = MaterialTheme.colorScheme.primary
+                                )
+                            )
+                        }
+
+                        if (alarmEnabled) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "Thời gian nhắc trước:",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                alarmLeadOptions.forEach { (mins, label) ->
+                                    val isSelected = alarmLeadMinutes == mins
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            1.dp,
+                                            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                        ),
+                                        modifier = Modifier.clickable { alarmLeadMinutes = mins }
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 // Color picker
-                Text("Màu sắc sự kiện", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                Text("Màu sắc", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1205,7 +1447,7 @@ private fun EventEditDialog(
                 ) {
                     if (onDelete != null) {
                         IconButton(onClick = onDelete) {
-                            Icon(Icons.Outlined.Delete, contentDescription = "Xóa sự kiện", tint = MaterialTheme.colorScheme.error)
+                            Icon(Icons.Rounded.Delete, contentDescription = "Xóa công việc", tint = MaterialTheme.colorScheme.error)
                         }
                         Spacer(modifier = Modifier.weight(1f))
                     }
@@ -1231,7 +1473,9 @@ private fun EventEditDialog(
                                 end = endDateTime,
                                 repeatDays = repeatDays.toList(),
                                 exceptionDates = existingEvent?.exceptionDates ?: emptyList(),
-                                untilDate = existingEvent?.untilDate
+                                untilDate = existingEvent?.untilDate,
+                                alarmEnabled = alarmEnabled,
+                                alarmLeadMinutes = alarmLeadMinutes
                             )
                             onSave(event)
                         },

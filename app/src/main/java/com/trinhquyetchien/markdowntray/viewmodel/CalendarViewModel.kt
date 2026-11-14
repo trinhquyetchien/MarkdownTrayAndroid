@@ -86,11 +86,7 @@ class CalendarViewModel(
 
     fun navigatePrevious() {
         val cal = _uiState.value.selectedCalendar.clone() as Calendar
-        when (_uiState.value.viewMode) {
-            CalendarViewMode.DAY, CalendarViewMode.TIMELINE -> cal.add(Calendar.DAY_OF_YEAR, -1)
-            CalendarViewMode.WEEK -> cal.add(Calendar.WEEK_OF_YEAR, -1)
-            CalendarViewMode.MONTH -> cal.add(Calendar.MONTH, -1)
-        }
+        cal.add(Calendar.DAY_OF_YEAR, -1)
         _uiState.value = _uiState.value.copy(
             selectedCalendar = cal,
             selectedYMD = CalendarUtils.formatYMD(cal.time)
@@ -99,11 +95,16 @@ class CalendarViewModel(
 
     fun navigateNext() {
         val cal = _uiState.value.selectedCalendar.clone() as Calendar
-        when (_uiState.value.viewMode) {
-            CalendarViewMode.DAY, CalendarViewMode.TIMELINE -> cal.add(Calendar.DAY_OF_YEAR, 1)
-            CalendarViewMode.WEEK -> cal.add(Calendar.WEEK_OF_YEAR, 1)
-            CalendarViewMode.MONTH -> cal.add(Calendar.MONTH, 1)
-        }
+        cal.add(Calendar.DAY_OF_YEAR, 1)
+        _uiState.value = _uiState.value.copy(
+            selectedCalendar = cal,
+            selectedYMD = CalendarUtils.formatYMD(cal.time)
+        )
+    }
+
+    fun navigateWeek(offsetWeeks: Int) {
+        val cal = _uiState.value.selectedCalendar.clone() as Calendar
+        cal.add(Calendar.WEEK_OF_YEAR, offsetWeeks)
         _uiState.value = _uiState.value.copy(
             selectedCalendar = cal,
             selectedYMD = CalendarUtils.formatYMD(cal.time)

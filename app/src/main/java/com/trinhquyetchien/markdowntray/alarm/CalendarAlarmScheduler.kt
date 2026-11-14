@@ -93,21 +93,30 @@ object CalendarAlarmScheduler {
                 }
 
                 if (isToday) {
+                    val alarmEnabled = ev.optBoolean("alarmEnabled", false)
+                    // Chỉ đặt báo thức nếu alarmEnabled = true hoặc sự kiện có bật hẹn giờ
+                    if (!alarmEnabled) continue
+
+                    val leadMinutes = ev.optInt("alarmLeadMinutes", 0)
+
                     val targetCal = Calendar.getInstance().apply {
                         set(Calendar.HOUR_OF_DAY, evHour)
                         set(Calendar.MINUTE, evMin)
                         set(Calendar.SECOND, 0)
                         set(Calendar.MILLISECOND, 0)
+                        add(Calendar.MINUTE, -leadMinutes)
                     }
 
                     val targetMs = targetCal.timeInMillis
                     if (targetMs > nowMs) {
                         val title = ev.optString("title", "Lịch biểu")
                         val note = ev.optString("note", "")
+                        val leadText = if (leadMinutes > 0) " (Trước $leadMinutes phút)" else ""
+                        val displayTitle = "$title$leadText"
                         val requestCode = (ev.optString("id", "${i}_$targetMs").hashCode() and 0x7FFFFFFF)
 
                         val intent = Intent(context, CalendarAlarmReceiver::class.java).apply {
-                            putExtra(CalendarAlarmReceiver.EXTRA_TITLE, title)
+                            putExtra(CalendarAlarmReceiver.EXTRA_TITLE, displayTitle)
                             putExtra(CalendarAlarmReceiver.EXTRA_NOTE, note)
                             putExtra(CalendarAlarmReceiver.EXTRA_ID, requestCode)
                         }

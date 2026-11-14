@@ -12,7 +12,9 @@ data class CalendarEvent(
     val end: String,   // format "YYYY-MM-DDTHH:MM:SS" or "YYYY-MM-DDTHH:MM"
     val repeatDays: List<Int> = emptyList(), // 0=Sun, 1=Mon, ..., 6=Sat
     val exceptionDates: List<String> = emptyList(), // ["YYYY-MM-DD"]
-    val untilDate: String? = null // "YYYY-MM-DD"
+    val untilDate: String? = null, // "YYYY-MM-DD"
+    val alarmEnabled: Boolean = false,
+    val alarmLeadMinutes: Int = 0 // 0 = Đúng giờ, 5, 15, 30, 60
 ) {
     fun toJsonObject(): JSONObject {
         val obj = JSONObject()
@@ -35,6 +37,8 @@ data class CalendarEvent(
         if (!untilDate.isNullOrEmpty()) {
             obj.put("untilDate", untilDate)
         }
+        obj.put("alarmEnabled", alarmEnabled)
+        obj.put("alarmLeadMinutes", alarmLeadMinutes)
         return obj
     }
 
@@ -67,7 +71,9 @@ data class CalendarEvent(
                 end = obj.optString("end", ""),
                 repeatDays = rList,
                 exceptionDates = eList,
-                untilDate = until
+                untilDate = until,
+                alarmEnabled = obj.optBoolean("alarmEnabled", false),
+                alarmLeadMinutes = obj.optInt("alarmLeadMinutes", 0)
             )
         }
     }

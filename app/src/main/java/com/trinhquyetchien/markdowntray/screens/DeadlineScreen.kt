@@ -44,18 +44,6 @@ fun DeadlineScreen(
                     style = MaterialTheme.typography.titleLarge
                 )
             },
-            actions = {
-                IconButton(onClick = {
-                    viewModel.loadContent()
-                    Toast.makeText(context, "Đã làm mới Deadline", Toast.LENGTH_SHORT).show()
-                }) {
-                    Icon(
-                        imageVector = Icons.Outlined.Refresh,
-                        contentDescription = "Làm mới",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            },
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = MaterialTheme.colorScheme.surface
             )

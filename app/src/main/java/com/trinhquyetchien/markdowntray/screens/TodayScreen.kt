@@ -20,15 +20,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.ArrowForward
-import androidx.compose.material.icons.outlined.ArrowForward
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.ExpandLess
-import androidx.compose.material.icons.outlined.ExpandMore
-import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.Today
-import androidx.compose.material.icons.outlined.WarningAmber
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.rounded.CalendarToday
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,7 +44,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -71,30 +67,58 @@ fun TodayScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
 
-    val displayFormat = remember { SimpleDateFormat("EEEE, dd/MM/yyyy", Locale.forLanguageTag("vi-VN")) }
     val isViewingToday = uiState.selectedDateStr == uiState.todayDateStr
+
+    // Định dạng đầy đủ: "Thứ ..., ngày dd tháng MM năm yyyy"
+    val fullDateTitle = remember(uiState.selectedCalendar.time) {
+        val cal = uiState.selectedCalendar
+        val dayOfWeek = when (cal.get(java.util.Calendar.DAY_OF_WEEK)) {
+            java.util.Calendar.MONDAY -> "Thứ Hai"
+            java.util.Calendar.TUESDAY -> "Thứ Ba"
+            java.util.Calendar.WEDNESDAY -> "Thứ Tư"
+            java.util.Calendar.THURSDAY -> "Thứ Năm"
+            java.util.Calendar.FRIDAY -> "Thứ Sáu"
+            java.util.Calendar.SATURDAY -> "Thứ Bảy"
+            java.util.Calendar.SUNDAY -> "Chủ Nhật"
+            else -> ""
+        }
+        val day = cal.get(java.util.Calendar.DAY_OF_MONTH)
+        val month = cal.get(java.util.Calendar.MONTH) + 1
+        val year = cal.get(java.util.Calendar.YEAR)
+        "$dayOfWeek, ngày $day tháng $month năm $year"
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         TopAppBar(
             title = {
                 Column {
                     Text(
-                        text = if (isViewingToday) "Hôm nay" else uiState.selectedDateStr,
+                        text = fullDateTitle,
                         fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleLarge
+                        style = MaterialTheme.typography.titleMedium
                     )
-                    Text(
-                        text = displayFormat.format(uiState.selectedCalendar.time).replaceFirstChar { it.uppercase() },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    if (isViewingToday) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                            modifier = Modifier.padding(top = 2.dp)
+                        ) {
+                            Text(
+                                text = "Hôm nay",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                 }
             },
             actions = {
                 // Hôm trước
                 IconButton(onClick = { viewModel.selectPreviousDay() }) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                         contentDescription = "Ngày trước",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -104,7 +128,7 @@ fun TodayScreen(
                 if (!isViewingToday) {
                     IconButton(onClick = { viewModel.selectToday() }) {
                         Icon(
-                            imageVector = Icons.Outlined.Today,
+                            imageVector = Icons.Rounded.CalendarToday,
                             contentDescription = "Hôm nay",
                             tint = MaterialTheme.colorScheme.primary
                         )
@@ -114,7 +138,7 @@ fun TodayScreen(
                 // Hôm sau
                 IconButton(onClick = { viewModel.selectNextDay() }) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
+                        imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
                         contentDescription = "Ngày sau",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -144,7 +168,7 @@ fun TodayScreen(
         }
 
         MarkdownViewer(
-            title = if (isViewingToday) "Ghi chú hôm nay (${uiState.selectedDateStr})" else uiState.selectedDateStr,
+            title = "Nội dung Markdown",
             rawContent = uiState.rawContent,
             syncInfo = uiState.syncInfo,
             onToggleTask = { lineIndex, isChecked ->
@@ -207,10 +231,10 @@ private fun OverdueTasksHeader(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        border = androidx.compose.foundation.BorderStroke(1.dp, StatusOrange.copy(alpha = 0.4f))
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, StatusOrange.copy(alpha = 0.25f))
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(14.dp)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -219,15 +243,23 @@ private fun OverdueTasksHeader(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Outlined.WarningAmber,
-                        contentDescription = null,
-                        tint = StatusOrange,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Surface(
+                        shape = CircleShape,
+                        color = StatusOrange.copy(alpha = 0.15f),
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Rounded.WarningAmber,
+                                contentDescription = null,
+                                tint = StatusOrange,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "Task trễ từ ngày trước (${tasks.size})",
+                        text = "Tồn đọng (${tasks.size})",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -235,7 +267,7 @@ private fun OverdueTasksHeader(
                 }
 
                 Icon(
-                    imageVector = if (isExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                    imageVector = if (isExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp)
@@ -255,15 +287,15 @@ private fun OverdueTasksHeader(
                 ) {
                     tasks.forEach { task ->
                         Surface(
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(12.dp),
                             color = MaterialTheme.colorScheme.surface,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Checkbox(
@@ -284,7 +316,7 @@ private fun OverdueTasksHeader(
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
-                                        text = "Từ ngày: ${task.dateStr}",
+                                        text = task.dateStr,
                                         style = MaterialTheme.typography.labelSmall,
                                         color = StatusOrange
                                     )
@@ -295,7 +327,7 @@ private fun OverdueTasksHeader(
                                     modifier = Modifier.size(32.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Outlined.ArrowForward,
+                                        imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
                                         contentDescription = "Chuyển sang hôm nay",
                                         tint = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(16.dp)
@@ -309,3 +341,4 @@ private fun OverdueTasksHeader(
         }
     }
 }
+

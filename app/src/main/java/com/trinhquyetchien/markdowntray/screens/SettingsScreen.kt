@@ -19,13 +19,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.FolderOpen
-import androidx.compose.material.icons.outlined.InsertDriveFile
-import androidx.compose.material.icons.outlined.RestartAlt
-import androidx.compose.material.icons.outlined.Save
-import androidx.compose.material.icons.outlined.Sync
-import androidx.compose.material.icons.outlined.Warning
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.InsertDriveFile
+import androidx.compose.material.icons.rounded.RestartAlt
+import androidx.compose.material.icons.rounded.Save
+import androidx.compose.material.icons.rounded.Sync
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -139,10 +139,22 @@ fun SettingsScreen(
         TopAppBar(
             title = {
                 Text(
-                    text = "Cài đặt & Đồng bộ",
+                    text = "Cài đặt",
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleLarge
                 )
+            },
+            actions = {
+                IconButton(onClick = {
+                    viewModel.refreshPermission()
+                    Toast.makeText(context, "Đã làm mới trạng thái", Toast.LENGTH_SHORT).show()
+                }) {
+                    Icon(
+                        imageVector = Icons.Rounded.Sync,
+                        contentDescription = "Đồng bộ / Làm mới",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
             },
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = MaterialTheme.colorScheme.surface
@@ -158,9 +170,9 @@ fun SettingsScreen(
         ) {
             // Permission Card
             Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -168,14 +180,14 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = if (uiState.hasStoragePermission) Icons.Outlined.CheckCircle else Icons.Outlined.Warning,
+                        imageVector = if (uiState.hasStoragePermission) Icons.Rounded.CheckCircle else Icons.Rounded.Warning,
                         contentDescription = null,
                         tint = if (uiState.hasStoragePermission) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(end = 12.dp)
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = if (uiState.hasStoragePermission) "Đã cấp quyền truy cập bộ nhớ" else "Chưa cấp quyền bộ nhớ ngoài",
+                            text = if (uiState.hasStoragePermission) "Đã cấp quyền bộ nhớ" else "Chưa cấp quyền bộ nhớ",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -192,6 +204,7 @@ fun SettingsScreen(
                     if (!uiState.hasStoragePermission) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(
+                            shape = RoundedCornerShape(12.dp),
                             onClick = {
                                 try {
                                     context.startActivity(storageManager.getRequestStoragePermissionIntent())
@@ -208,100 +221,95 @@ fun SettingsScreen(
 
             // Path Configuration Card with Folder & File Pickers
             Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(Icons.Rounded.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Đường dẫn thư mục & tệp (Syncthing)",
+                            text = "Đường dẫn & Syncthing",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
 
-                    Text(
-                        text = "Chọn thư mục hoặc tệp trực tiếp bằng nút duyệt bên cạnh hoặc chỉnh sửa đường dẫn.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
                     // 1. Thư mục Note chính
                     OutlinedTextField(
                         value = notesRootDir,
                         onValueChange = { notesRootDir = it },
-                        label = { Text("Thư mục Note chính (Notes Root)") },
+                        label = { Text("Thư mục Note chính") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
                         trailingIcon = {
                             IconButton(onClick = { notesRootFolderLauncher.launch(null) }) {
-                                Icon(Icons.Outlined.FolderOpen, contentDescription = "Chọn thư mục Note", tint = MaterialTheme.colorScheme.primary)
+                                Icon(Icons.Rounded.FolderOpen, contentDescription = "Duyệt thư mục", tint = MaterialTheme.colorScheme.primary)
                             }
                         }
                     )
 
-                    // 2. Thư mục Daily Notes
+                    // 2. Thư mục Daily
                     OutlinedTextField(
                         value = dailyDir,
                         onValueChange = { dailyDir = it },
-                        label = { Text("Thư mục Daily Notes") },
+                        label = { Text("Thư mục Daily") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
                         trailingIcon = {
                             IconButton(onClick = { dailyFolderLauncher.launch(null) }) {
-                                Icon(Icons.Outlined.FolderOpen, contentDescription = "Chọn thư mục Daily", tint = MaterialTheme.colorScheme.primary)
+                                Icon(Icons.Rounded.FolderOpen, contentDescription = "Duyệt thư mục", tint = MaterialTheme.colorScheme.primary)
                             }
                         }
                     )
 
-                    // 3. Tệp Deadline
+                    // 3. Tệp Deadline.md
                     OutlinedTextField(
                         value = deadlineFile,
                         onValueChange = { deadlineFile = it },
-                        label = { Text("Đường dẫn tệp Deadline (Deadline.md)") },
+                        label = { Text("Tệp Deadline") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
                         trailingIcon = {
-                            IconButton(onClick = { deadlineFileLauncher.launch(arrayOf("*/*")) }) {
-                                Icon(Icons.Outlined.InsertDriveFile, contentDescription = "Chọn tệp Deadline", tint = MaterialTheme.colorScheme.primary)
+                            IconButton(onClick = { deadlineFileLauncher.launch(arrayOf("text/markdown", "text/plain", "*/*")) }) {
+                                Icon(Icons.Rounded.InsertDriveFile, contentDescription = "Chọn tệp", tint = MaterialTheme.colorScheme.primary)
                             }
                         }
                     )
 
-                    // 4. Tệp Calendar
+                    // 4. Tệp calendar.json
                     OutlinedTextField(
                         value = calendarFile,
                         onValueChange = { calendarFile = it },
-                        label = { Text("Đường dẫn tệp Calendar (calendar.json)") },
+                        label = { Text("Tệp Lịch biểu (calendar.json)") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
                         trailingIcon = {
-                            IconButton(onClick = { calendarFileLauncher.launch(arrayOf("*/*")) }) {
-                                Icon(Icons.Outlined.InsertDriveFile, contentDescription = "Chọn tệp Calendar", tint = MaterialTheme.colorScheme.primary)
+                            IconButton(onClick = { calendarFileLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) }) {
+                                Icon(Icons.Rounded.InsertDriveFile, contentDescription = "Chọn tệp", tint = MaterialTheme.colorScheme.primary)
                             }
                         }
                     )
 
+                    // Action Buttons (Save & Reset)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         OutlinedButton(
                             onClick = {
                                 viewModel.resetToDefaults()
-                                Toast.makeText(context, "Đã khôi phục mặc định", Toast.LENGTH_SHORT).show()
-                            }
+                                Toast.makeText(context, "Đã đặt lại đường dẫn mặc định", Toast.LENGTH_SHORT).show()
+                            },
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Icon(Icons.Outlined.RestartAlt, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(Icons.Rounded.RestartAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text("Mặc định")
                         }
-
-                        Spacer(modifier = Modifier.width(8.dp))
 
                         Button(
                             onClick = {
@@ -312,11 +320,13 @@ fun SettingsScreen(
                                     calendarFile = calendarFile
                                 )
                                 Toast.makeText(context, "Đã lưu cài đặt", Toast.LENGTH_SHORT).show()
-                            }
+                            },
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Lưu cấu hình", fontWeight = FontWeight.Bold)
+                            Icon(Icons.Rounded.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Lưu")
                         }
                     }
                 }
