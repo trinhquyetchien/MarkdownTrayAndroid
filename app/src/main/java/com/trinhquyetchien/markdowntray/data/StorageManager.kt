@@ -83,6 +83,7 @@ class StorageManager(private val context: Context) {
         private const val KEY_DEADLINE_FILE = "key_deadline_file"
         private const val KEY_DEADLINE_ALIAS = "key_deadline_alias"
         private const val KEY_CALENDAR_FILE = "key_calendar_file"
+        private const val KEY_ALARMS_FILE = "key_alarms_file"
         private const val KEY_NOTES_ROOT_DIR = "key_notes_root_dir"
         private const val KEY_CUSTOM_MENUS_JSON = "key_custom_menus_json"
 
@@ -92,6 +93,7 @@ class StorageManager(private val context: Context) {
         val DEFAULT_DEADLINE_FILE: String = "$DEFAULT_STORAGE_ROOT/Documents/Deadline/Deadline.md"
         val LEGACY_DEADLINE_FILE: String = "$DEFAULT_STORAGE_ROOT/Note/Daily/Deadline.md"
         val DEFAULT_CALENDAR_FILE: String = "$DEFAULT_STORAGE_ROOT/Documents/calendar.json"
+        val DEFAULT_ALARMS_FILE: String = "$DEFAULT_STORAGE_ROOT/Documents/alarms.json"
     }
 
     var dailyNotesDir: String
@@ -122,6 +124,10 @@ class StorageManager(private val context: Context) {
     var calendarFilePath: String
         get() = prefs.getString(KEY_CALENDAR_FILE, DEFAULT_CALENDAR_FILE) ?: DEFAULT_CALENDAR_FILE
         set(value) = prefs.edit().putString(KEY_CALENDAR_FILE, value).apply()
+
+    var alarmsFilePath: String
+        get() = prefs.getString(KEY_ALARMS_FILE, DEFAULT_ALARMS_FILE) ?: DEFAULT_ALARMS_FILE
+        set(value) = prefs.edit().putString(KEY_ALARMS_FILE, value).apply()
 
     fun getTodayDateString(): String {
         return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
@@ -187,6 +193,43 @@ class StorageManager(private val context: Context) {
 
     fun getCalendarFile(): File {
         return File(calendarFilePath)
+    }
+
+    fun getAlarmsFile(): File {
+        return File(alarmsFilePath)
+    }
+
+    fun loadStandaloneAlarms(): List<StandaloneAlarm> {
+        val file = getAlarmsFile()
+        if (!file.exists()) return emptyList()
+        return try {
+            val content = file.readText(Charsets.UTF_8).trim()
+            if (content.isEmpty()) return emptyList()
+            val array = org.json.JSONArray(content)
+            val list = mutableListOf<StandaloneAlarm>()
+            for (i in 0 until array.length()) {
+                val obj = array.optJSONObject(i) ?: continue
+                list.add(StandaloneAlarm.fromJsonObject(obj))
+            }
+            list
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    fun saveStandaloneAlarms(alarms: List<StandaloneAlarm>): Boolean {
+        val file = getAlarmsFile()
+        return try {
+            val array = org.json.JSONArray()
+            for (alarm in alarms) {
+                array.put(alarm.toJsonObject())
+            }
+            writeText(file, array.toString(2))
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
     }
 
     fun getNotesRootFolder(): File {
