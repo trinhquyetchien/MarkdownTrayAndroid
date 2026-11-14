@@ -79,6 +79,7 @@ import java.io.File
 fun NotesListScreen(
     storageManager: StorageManager,
     modifier: Modifier = Modifier,
+    onClose: (() -> Unit)? = null,
     viewModel: NotesListViewModel = viewModel(
         factory = AppViewModelFactory(LocalContext.current, storageManager)
     )
@@ -86,9 +87,13 @@ fun NotesListScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
 
-    // Handle Back Press to navigate up directories if inside subfolder
-    BackHandler(enabled = uiState.currentFolder.absolutePath != uiState.rootFolder.absolutePath) {
-        viewModel.navigateUp()
+    // Handle Back Press to navigate up directories if inside subfolder or close modal
+    BackHandler(enabled = uiState.currentFolder.absolutePath != uiState.rootFolder.absolutePath || onClose != null) {
+        if (uiState.currentFolder.absolutePath != uiState.rootFolder.absolutePath) {
+            viewModel.navigateUp()
+        } else {
+            onClose?.invoke()
+        }
     }
 
     Scaffold(
@@ -118,6 +123,14 @@ fun NotesListScreen(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                                 contentDescription = "Quay lại",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else if (onClose != null) {
+                        IconButton(onClick = onClose) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = "Đóng",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }

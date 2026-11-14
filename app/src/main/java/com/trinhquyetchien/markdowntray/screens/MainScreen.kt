@@ -9,9 +9,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
@@ -43,8 +43,8 @@ fun MainScreen(
         listOf(
             Triple(0, Icons.Rounded.CheckCircle, "Hôm nay"),
             Triple(1, Icons.Rounded.CalendarMonth, "Lịch"),
-            Triple(2, Icons.Rounded.Schedule, "Deadline"),
-            Triple(3, Icons.Rounded.Folder, "Tập tin"),
+            Triple(2, Icons.Rounded.Alarm, "Báo thức"),
+            Triple(3, Icons.Rounded.Schedule, "Deadline"),
             Triple(4, Icons.Rounded.Settings, "Cài đặt")
         )
     }
@@ -110,8 +110,8 @@ fun MainScreen(
             when (selectedTabIndex) {
                 0 -> TodayScreen(storageManager = storageManager)
                 1 -> CalendarScreen(storageManager = storageManager)
-                2 -> DeadlineScreen(storageManager = storageManager)
-                3 -> NotesListScreen(storageManager = storageManager)
+                2 -> AlarmScreen(storageManager = storageManager)
+                3 -> DeadlineScreen(storageManager = storageManager)
                 4 -> SettingsScreen(storageManager = storageManager)
             }
         }
